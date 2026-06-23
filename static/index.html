@@ -4,17 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sanctuaire Non-OGM | Sync Zenodo</title>
-    <!-- Tailwind CSS pour le style -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue.js pour la logique -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         .log-entry { font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; }
-        .log-info { color: #60a5fa; } /* Bleu */
-        .log-success { color: #34d399; } /* Vert */
-        .log-error { color: #f87171; } /* Rouge */
-        .log-warn { color: #fbbf24; } /* Orange */
-        /* Animation de chargement */
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-error { color: #f87171; }
+        .log-warn { color: #fbbf24; }
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -27,6 +24,18 @@
             margin-right: 10px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .checkbox-tile { transition: all 0.2s; }
+        .checkbox-tile:hover { background-color: #334155; }
+        input[type="checkbox"]:checked + div {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+            color: white;
+        }
+        /* Scrollbar personnalisée pour les logs */
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased">
@@ -34,88 +43,118 @@
         
         <!-- Header -->
         <header class="bg-slate-800 border-b border-slate-700 shadow-lg">
-            <div class="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Outil de preuve d'antériorité Zenodo</p>
+                        <p class="text-xs text-slate-400">Sélection avancée & Synchronisation Zenodo</p>
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">
-                    v1.0.0
+                <div class="flex space-x-2">
+                    <button @click="saveConfig" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition">
+                        💾 Sauvegarder
+                    </button>
+                    <button @click="clearConfig" class="text-xs bg-slate-700 hover:bg-red-900/50 text-white px-3 py-1.5 rounded transition">
+                        🗑️ Effacer
+                    </button>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
-        <main class="flex-grow max-w-5xl mx-auto w-full px-6 py-8">
+        <main class="flex-grow max-w-6xl mx-auto w-full px-6 py-8">
             
-            <!-- Configuration Card -->
+            <!-- 1. Configuration Connexion -->
             <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8">
                 <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-                    <span class="mr-2">⚙️</span> Configuration
+                    <span class="mr-2">🔌</span> Connexion
                 </h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Directus -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
-                        <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider">Directus</h3>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">URL de l'instance</label>
-                            <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="http://localhost:8058">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">Token Admin</label>
-                            <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="Token...">
-                        </div>
+                        <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
+                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none transition" placeholder="URL (ex: http://localhost:8058)">
+                        <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none transition" placeholder="Token Admin">
                     </div>
-
-                    <!-- Zenodo -->
                     <div class="space-y-4">
-                        <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">Zenodo</h3>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">URL (Sandbox ou Prod)</label>
-                            <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition" placeholder="https://sandbox.zenodo.org">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">Token API</label>
-                            <input v-model="config.zenodo_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition" placeholder="Token...">
-                        </div>
+                        <h3 class="text-sm font-bold text-emerald-400 uppercase">Zenodo</h3>
+                        <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none transition" placeholder="URL (ex: https://sandbox.zenodo.org)">
+                        <input v-model="config.zenodo_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none transition" placeholder="Token API">
                     </div>
                 </div>
+                <div class="mt-4 flex justify-between items-center">
+                    <span v-if="connectionStatus" :class="connectionStatus.success ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-bold">
+                        {{ connectionStatus.message }}
+                    </span>
+                    <button @click="testConnection" class="text-xs text-indigo-400 hover:text-indigo-300 underline">Tester la connexion</button>
+                </div>
+            </div>
 
-                <!-- Mapping -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-700">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Collection Directus</label>
-                        <input v-model="config.collection" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="Variete">
+            <!-- 2. Sélection de la Structure -->
+            <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8" v-if="config.directus_url && config.directus_token">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <span class="mr-2">📂</span> Sélection des Données
+                </h2>
+                
+                <!-- Étape A : Charger les tables -->
+                <div class="mb-6">
+                    <button @click="loadCollections" :disabled="loadingCollections" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm transition flex items-center disabled:opacity-50">
+                        <span v-if="loadingCollections" class="spinner w-4 h-4 border-2 border-white/30 border-t-white mr-2"></span>
+                        {{ loadingCollections ? 'Chargement...' : '1. Charger la liste des tables' }}
+                    </button>
+                </div>
+
+                <!-- Étape B : Choisir la table -->
+                <div v-if="collections.length > 0" class="mb-6 p-4 bg-slate-900 rounded border border-slate-700">
+                    <label class="block text-sm text-slate-400 mb-2">2. Choisissez la collection à synchroniser :</label>
+                    <select v-model="selectedCollection" @change="loadFields" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white focus:border-indigo-500 outline-none">
+                        <option value="" disabled>-- Sélectionner une table --</option>
+                        <option v-for="col in collections" :key="col.collection" :value="col.collection">
+                            {{ col.collection }} {{ col.meta?.note ? '(' + col.meta.note + ')' : '' }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Étape C : Choisir les champs -->
+                <div v-if="fields.length > 0" class="p-4 bg-slate-900 rounded border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="block text-sm text-slate-400">3. Sélectionnez les champs à inclure :</label>
+                        <div class="space-x-2">
+                            <button @click="selectAllFields" class="text-xs text-indigo-400 hover:underline">Tout sélectionner</button>
+                            <button @click="deselectAllFields" class="text-xs text-slate-400 hover:underline">Aucun</button>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Champ Titre</label>
-                        <input v-model="config.fields_mapping.title_field" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="Nom">
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll">
+                        <label v-for="field in fields" :key="field.field" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
+                            <input type="checkbox" :value="field.field" v-model="selectedFields" class="hidden">
+                            <div class="text-xs text-slate-300 break-all">
+                                <span class="font-bold text-indigo-300">{{ field.field }}</span>
+                                <span v-if="field.meta?.note" class="block text-[10px] text-slate-500 truncate">{{ field.meta.note }}</span>
+                            </div>
+                        </label>
                     </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Champs Description</label>
-                        <input v-model="descFieldsInput" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="Description, notes">
+                    
+                    <div class="mt-4 pt-4 border-t border-slate-800">
+                        <label class="block text-sm text-slate-400 mb-1">Champ utilisé comme TITRE principal du DOI :</label>
+                        <select v-model="config.fields_mapping.title_field" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full md:w-1/2">
+                            <option v-for="field in fields" :key="field.field" :value="field.field">
+                                {{ field.field }}
+                            </option>
+                        </select>
                     </div>
                 </div>
             </div>
 
-            <!-- Action Area -->
-            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <div class="text-sm text-slate-400">
-                    Prêt à synchroniser <strong>{{ config.collection }}</strong> vers Zenodo.
-                </div>
-                <button @click="startSync" :disabled="running || !isConfigValid" 
-                    class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition transform hover:scale-105 disabled:transform-none flex items-center justify-center">
-                    
+            <!-- 3. Lancement -->
+            <div class="flex justify-end mb-6">
+                <button @click="startSync" :disabled="running || !isReadyToSync" 
+                    class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition flex items-center">
                     <div v-if="running" class="spinner"></div>
                     <span>{{ running ? 'Synchronisation en cours...' : '🚀 Lancer la Synchronisation' }}</span>
                 </button>
             </div>
 
-            <!-- Console Logs -->
+            <!-- 4. Terminal Output -->
             <div class="bg-black rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col h-96">
                 <div class="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
                     <span class="text-xs font-mono text-slate-400">Terminal Output</span>
@@ -125,27 +164,18 @@
                         <div class="w-3 h-3 rounded-full bg-green-500"></div>
                     </div>
                 </div>
-                <div ref="logContainer" class="p-4 overflow-y-auto flex-grow font-mono text-sm space-y-1">
+                <div ref="logContainer" class="p-4 overflow-y-auto flex-grow font-mono text-sm space-y-1 custom-scroll">
                     <div v-if="logs.length === 0" class="text-slate-600 italic">
-                        > En attente de démarrage...<br>
-                        > Configurez les paramètres ci-dessus et cliquez sur Lancer.
+                        > En attente...<br>
+                        > Commencez par tester la connexion puis charger les tables.
                     </div>
-                    <div v-for="(log, index) in logs" :key="index" class="log-entry break-words" :class="getLogClass(log)">
-                        <span class="opacity-50 mr-2">{{ new Date().toLocaleTimeString() }}</span>
+                    <div v-for="(log, index) in logs" :key="index" class="log-entry break-words p-1 rounded" :class="getLogClass(log)">
                         {{ log }}
                     </div>
                 </div>
             </div>
 
         </main>
-
-        <!-- Footer -->
-        <footer class="bg-slate-900 border-t border-slate-800 py-6 mt-auto">
-            <div class="max-w-5xl mx-auto px-6 text-center text-xs text-slate-500">
-                <p>Sanctuaire Non-OGM &copy; 2024. Code open source sous licence MIT.</p>
-                <p class="mt-1">Les données sont traitées localement et envoyées directement à Zenodo.</p>
-            </div>
-        </footer>
     </div>
 
     <script>
@@ -158,77 +188,176 @@
                         directus_token: '',
                         zenodo_url: 'https://sandbox.zenodo.org',
                         zenodo_token: '',
-                        collection: 'Variete',
+                        collection: '',
                         fields_mapping: {
-                            title_field: 'Nom',
-                            desc_fields: []
+                            title_field: '',
+                            selected_fields: []
                         }
                     },
-                    descFieldsInput: 'Description, notes_diverses',
-                    running: false,
+                    connectionStatus: null,
+                    loadingCollections: false,
+                    collections: [],
+                    selectedCollection: '',
+                    fields: [],
+                    selectedFields: [],
                     logs: [],
+                    running: false,
                     pollInterval: null
                 }
             },
-            computed: {
-                isConfigValid() {
-                    return this.config.directus_url && this.config.directus_token && 
-                           this.config.zenodo_url && this.config.zenodo_token && this.config.collection;
+            mounted() {
+                // Charger la configuration sauvegardée si elle existe
+                const saved = localStorage.getItem('sanctuaire_config');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        // Fusionner avec la config par défaut pour éviter les erreurs si structure change
+                        this.config = { ...this.config, ...parsed, fields_mapping: { ...this.config.fields_mapping, ...parsed.fields_mapping } };
+                        this.addLog("⚙️ Configuration précédente chargée.", "info");
+                    } catch (e) {
+                        console.error("Erreur chargement config", e);
+                    }
                 }
             },
-            watch: {
-                descFieldsInput(val) {
-                    this.config.fields_mapping.desc_fields = val.split(',').map(s => s.trim()).filter(s => s);
+            computed: {
+                isReadyToSync() {
+                    return this.config.directus_url && this.config.directus_token && 
+                           this.selectedCollection && this.selectedFields.length > 0 && 
+                           this.config.fields_mapping.title_field &&
+                           this.config.zenodo_url && this.config.zenodo_token;
                 }
             },
             methods: {
+                saveConfig() {
+                    localStorage.setItem('sanctuaire_config', JSON.stringify(this.config));
+                    this.addLog("💾 Configuration sauvegardée dans le navigateur.", "success");
+                },
+                clearConfig() {
+                    localStorage.removeItem('sanctuaire_config');
+                    this.addLog("🗑️ Configuration effacée.", "warn");
+                    location.reload();
+                },
+                async testConnection() {
+                    this.connectionStatus = null;
+                    this.addLog("🔍 Test de connexion à Directus...", "info");
+                    try {
+                        const res = await fetch(`${this.config.directus_url}/server/info`, {
+                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        });
+                        if (res.ok) {
+                            this.connectionStatus = { success: true, message: "✅ Connexion Directus établie" };
+                            this.addLog("✅ Connexion Directus réussie !", "success");
+                        } else {
+                            this.connectionStatus = { success: false, message: "❌ Échec connexion" };
+                            this.addLog("❌ Échec connexion. Vérifiez URL et Token.", "error");
+                        }
+                    } catch (e) {
+                        this.connectionStatus = { success: false, message: "❌ Erreur réseau" };
+                        this.addLog(`❌ Erreur réseau: ${e.message}`, "error");
+                    }
+                },
+                async loadCollections() {
+                    this.loadingCollections = true;
+                    this.addLog("📡 Chargement de la liste des tables...", "info");
+                    try {
+                        const res = await fetch(`${this.config.directus_url}/collections`, {
+                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        });
+                        const data = await res.json();
+                        if (data.data) {
+                            this.collections = data.data;
+                            this.addLog(`✅ ${this.collections.length} tables trouvées.`, "success");
+                        }
+                    } catch (e) {
+                        this.addLog(`❌ Erreur chargement tables: ${e.message}`, "error");
+                    } finally {
+                        this.loadingCollections = false;
+                    }
+                },
+                async loadFields() {
+                    if (!this.selectedCollection) return;
+                    this.config.collection = this.selectedCollection;
+                    this.addLog(`🔍 Chargement des champs pour '${this.selectedCollection}'...`, "info");
+                    try {
+                        const res = await fetch(`${this.config.directus_url}/fields/${this.selectedCollection}`, {
+                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        });
+                        const data = await res.json();
+                        if (data.data) {
+                            const systemFields = ['date_created', 'date_updated', 'user_created', 'user_updated', 'sort', 'id'];
+                            this.fields = data.data.filter(f => !systemFields.includes(f.field));
+                            
+                            const commonFields = ['Nom', 'Name', 'Description', 'Notes', 'acc_spiece', 'acc_name_of_accession'];
+                            this.selectedFields = this.fields
+                                .filter(f => commonFields.some(cf => f.field.toLowerCase().includes(cf.toLowerCase())))
+                                .map(f => f.field);
+                            
+                            const titleCandidate = this.fields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title'].includes(f.field));
+                            if (titleCandidate) {
+                                this.config.fields_mapping.title_field = titleCandidate.field;
+                            } else if (this.fields.length > 0) {
+                                this.config.fields_mapping.title_field = this.fields[0].field;
+                            }
+
+                            this.addLog(`✅ ${this.fields.length} champs chargés.`, "success");
+                        }
+                    } catch (e) {
+                        this.addLog(`❌ Erreur chargement champs: ${e.message}`, "error");
+                    }
+                },
+                selectAllFields() {
+                    this.selectedFields = this.fields.map(f => f.field);
+                },
+                deselectAllFields() {
+                    this.selectedFields = [];
+                },
                 async startSync() {
                     this.logs = [];
                     this.running = true;
-                    this.addLog("🚀 Initialisation de la synchronisation...", "info");
+                    this.addLog("🚀 Démarrage de la synchronisation...", "info");
                     
+                    const syncConfig = {
+                        directus_url: this.config.directus_url,
+                        directus_token: this.config.directus_token,
+                        zenodo_url: this.config.zenodo_url,
+                        zenodo_token: this.config.zenodo_token,
+                        collection: this.selectedCollection,
+                        fields_mapping: {
+                            title_field: this.config.fields_mapping.title_field,
+                            selected_fields: this.selectedFields
+                        }
+                    };
+
                     try {
                         const res = await fetch('/api/start-sync', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(this.config)
+                            body: JSON.stringify(syncConfig)
                         });
-                        
-                        if (!res.ok) {
-                            const err = await res.json();
-                            throw new Error(err.detail || 'Échec démarrage');
-                        }
-                        
-                        this.addLog("✅ Connexion au serveur de synchronisation établie.", "success");
+                        if (!res.ok) throw new Error('Échec démarrage');
                         this.pollLogs();
                     } catch (e) {
-                        this.addLog(`❌ Erreur critique: ${e.message}`, "error");
+                        this.addLog(`❌ Erreur: ${e.message}`, "error");
                         this.running = false;
                     }
                 },
                 async pollLogs() {
                     if (this.pollInterval) clearInterval(this.pollInterval);
-                    
                     this.pollInterval = setInterval(async () => {
                         try {
                             const res = await fetch('/api/logs');
                             const data = await res.json();
-                            
-                            // Ajouter seulement les nouveaux logs
                             if (data.logs.length > this.logs.length) {
                                 const newLogs = data.logs.slice(this.logs.length);
                                 newLogs.forEach(log => this.addLog(log, this.detectLogLevel(log)));
                                 this.scrollToBottom();
                             }
-
                             if (!data.running && this.running) {
                                 this.running = false;
                                 clearInterval(this.pollInterval);
-                                this.addLog("🏁 Processus terminé.", "success");
+                                this.addLog("🏁 Terminé.", "success");
                             }
-                        } catch (e) {
-                            console.error("Erreur polling logs", e);
-                        }
+                        } catch (e) { console.error(e); }
                     }, 1000);
                 },
                 addLog(msg, type = 'info') {
@@ -237,20 +366,18 @@
                 detectLogLevel(msg) {
                     if (msg.includes('❌') || msg.includes('Erreur')) return 'error';
                     if (msg.includes('🎉') || msg.includes('SUCCÈS') || msg.includes('✅')) return 'success';
-                    if (msg.includes('⚠️') || msg.includes('Warning')) return 'warn';
+                    if (msg.includes('⚠️')) return 'warn';
                     return 'info';
                 },
                 getLogClass(log) {
-                    if (log.includes('❌') || log.includes('Erreur')) return 'log-error';
-                    if (log.includes('🎉') || log.includes('SUCCÈS') || log.includes('✅')) return 'log-success';
-                    if (log.includes('⚠️')) return 'log-warn';
+                    if (log.includes('❌')) return 'log-error bg-red-900/10';
+                    if (log.includes('🎉') || log.includes('✅')) return 'log-success bg-emerald-900/10';
+                    if (log.includes('⚠️')) return 'log-warn bg-yellow-900/10';
                     return 'log-info';
                 },
                 scrollToBottom() {
                     this.$nextTick(() => {
-                        if (this.$refs.logContainer) {
-                            this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
-                        }
+                        if (this.$refs.logContainer) this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
                     });
                 }
             }
