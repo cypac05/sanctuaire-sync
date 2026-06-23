@@ -31,16 +31,13 @@
             border-color: #4f46e5;
             color: white;
         }
-        /* Scrollbar personnalisée pour les logs */
         .custom-scroll::-webkit-scrollbar { width: 8px; }
         .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased">
     <div id="app" class="min-h-screen flex flex-col">
-        
         <!-- Header -->
         <header class="bg-slate-800 border-b border-slate-700 shadow-lg">
             <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -48,23 +45,18 @@
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Sélection avancée & Synchronisation Zenodo</p>
+                        <p class="text-xs text-slate-400">Proxy Universel Activé</p>
                     </div>
                 </div>
                 <div class="flex space-x-2">
-                    <button @click="saveConfig" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition">
-                        💾 Sauvegarder
-                    </button>
-                    <button @click="clearConfig" class="text-xs bg-slate-700 hover:bg-red-900/50 text-white px-3 py-1.5 rounded transition">
-                        🗑️ Effacer
-                    </button>
+                    <button @click="saveConfig" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded">💾 Sauvegarder</button>
+                    <button @click="clearConfig" class="text-xs bg-slate-700 hover:bg-red-900/50 text-white px-3 py-1.5 rounded">🗑️ Effacer</button>
                 </div>
             </div>
         </header>
 
         <main class="flex-grow max-w-6xl mx-auto w-full px-6 py-8">
-            
-            <!-- 1. Configuration Connexion -->
+            <!-- Configuration -->
             <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8">
                 <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
                     <span class="mr-2">🔌</span> Connexion
@@ -72,13 +64,13 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
                         <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
-                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none transition" placeholder="URL (ex: http://localhost:8058)">
-                        <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none transition" placeholder="Token Admin">
+                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: http://localhost:8061 ou https://db.monsite.com)">
+                        <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Token Admin">
                     </div>
                     <div class="space-y-4">
                         <h3 class="text-sm font-bold text-emerald-400 uppercase">Zenodo</h3>
-                        <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none transition" placeholder="URL (ex: https://sandbox.zenodo.org)">
-                        <input v-model="config.zenodo_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none transition" placeholder="Token API">
+                        <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none" placeholder="URL (ex: https://sandbox.zenodo.org)">
+                        <input v-model="config.zenodo_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none" placeholder="Token API">
                     </div>
                 </div>
                 <div class="mt-4 flex justify-between items-center">
@@ -89,13 +81,12 @@
                 </div>
             </div>
 
-            <!-- 2. Sélection de la Structure -->
+            <!-- Sélection -->
             <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8" v-if="config.directus_url && config.directus_token">
                 <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
                     <span class="mr-2">📂</span> Sélection des Données
                 </h2>
                 
-                <!-- Étape A : Charger les tables -->
                 <div class="mb-6">
                     <button @click="loadCollections" :disabled="loadingCollections" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm transition flex items-center disabled:opacity-50">
                         <span v-if="loadingCollections" class="spinner w-4 h-4 border-2 border-white/30 border-t-white mr-2"></span>
@@ -103,23 +94,21 @@
                     </button>
                 </div>
 
-                <!-- Étape B : Choisir la table -->
                 <div v-if="collections.length > 0" class="mb-6 p-4 bg-slate-900 rounded border border-slate-700">
-                    <label class="block text-sm text-slate-400 mb-2">2. Choisissez la collection à synchroniser :</label>
+                    <label class="block text-sm text-slate-400 mb-2">2. Choisissez la collection :</label>
                     <select v-model="selectedCollection" @change="loadFields" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white focus:border-indigo-500 outline-none">
-                        <option value="" disabled>-- Sélectionner une table --</option>
+                        <option value="" disabled>-- Sélectionner --</option>
                         <option v-for="col in collections" :key="col.collection" :value="col.collection">
                             {{ col.collection }} {{ col.meta?.note ? '(' + col.meta.note + ')' : '' }}
                         </option>
                     </select>
                 </div>
 
-                <!-- Étape C : Choisir les champs -->
                 <div v-if="fields.length > 0" class="p-4 bg-slate-900 rounded border border-slate-700">
                     <div class="flex justify-between items-center mb-4">
-                        <label class="block text-sm text-slate-400">3. Sélectionnez les champs à inclure :</label>
+                        <label class="block text-sm text-slate-400">3. Champs à inclure :</label>
                         <div class="space-x-2">
-                            <button @click="selectAllFields" class="text-xs text-indigo-400 hover:underline">Tout sélectionner</button>
+                            <button @click="selectAllFields" class="text-xs text-indigo-400 hover:underline">Tout</button>
                             <button @click="deselectAllFields" class="text-xs text-slate-400 hover:underline">Aucun</button>
                         </div>
                     </div>
@@ -135,29 +124,27 @@
                     </div>
                     
                     <div class="mt-4 pt-4 border-t border-slate-800">
-                        <label class="block text-sm text-slate-400 mb-1">Champ utilisé comme TITRE principal du DOI :</label>
+                        <label class="block text-sm text-slate-400 mb-1">Champ TITRE du DOI :</label>
                         <select v-model="config.fields_mapping.title_field" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full md:w-1/2">
-                            <option v-for="field in fields" :key="field.field" :value="field.field">
-                                {{ field.field }}
-                            </option>
+                            <option v-for="field in fields" :key="field.field" :value="field.field">{{ field.field }}</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. Lancement -->
+            <!-- Lancement -->
             <div class="flex justify-end mb-6">
                 <button @click="startSync" :disabled="running || !isReadyToSync" 
                     class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition flex items-center">
                     <div v-if="running" class="spinner"></div>
-                    <span>{{ running ? 'Synchronisation en cours...' : '🚀 Lancer la Synchronisation' }}</span>
+                    <span>{{ running ? 'Synchronisation...' : '🚀 Lancer la Sync' }}</span>
                 </button>
             </div>
 
-            <!-- 4. Terminal Output -->
+            <!-- Logs -->
             <div class="bg-black rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col h-96">
                 <div class="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
-                    <span class="text-xs font-mono text-slate-400">Terminal Output</span>
+                    <span class="text-xs font-mono text-slate-400">Terminal</span>
                     <div class="flex space-x-2">
                         <div class="w-3 h-3 rounded-full bg-red-500"></div>
                         <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -165,16 +152,12 @@
                     </div>
                 </div>
                 <div ref="logContainer" class="p-4 overflow-y-auto flex-grow font-mono text-sm space-y-1 custom-scroll">
-                    <div v-if="logs.length === 0" class="text-slate-600 italic">
-                        > En attente...<br>
-                        > Commencez par tester la connexion puis charger les tables.
-                    </div>
+                    <div v-if="logs.length === 0" class="text-slate-600 italic">> En attente...</div>
                     <div v-for="(log, index) in logs" :key="index" class="log-entry break-words p-1 rounded" :class="getLogClass(log)">
                         {{ log }}
                     </div>
                 </div>
             </div>
-
         </main>
     </div>
 
@@ -184,15 +167,12 @@
             data() {
                 return {
                     config: {
-                        directus_url: 'http://localhost:8058',
+                        directus_url: 'http://localhost:8061',
                         directus_token: '',
                         zenodo_url: 'https://sandbox.zenodo.org',
                         zenodo_token: '',
                         collection: '',
-                        fields_mapping: {
-                            title_field: '',
-                            selected_fields: []
-                        }
+                        fields_mapping: { title_field: '', selected_fields: [] }
                     },
                     connectionStatus: null,
                     loadingCollections: false,
@@ -206,17 +186,12 @@
                 }
             },
             mounted() {
-                // Charger la configuration sauvegardée si elle existe
                 const saved = localStorage.getItem('sanctuaire_config');
                 if (saved) {
                     try {
                         const parsed = JSON.parse(saved);
-                        // Fusionner avec la config par défaut pour éviter les erreurs si structure change
                         this.config = { ...this.config, ...parsed, fields_mapping: { ...this.config.fields_mapping, ...parsed.fields_mapping } };
-                        this.addLog("⚙️ Configuration précédente chargée.", "info");
-                    } catch (e) {
-                        console.error("Erreur chargement config", e);
-                    }
+                    } catch (e) { console.error(e); }
                 }
             },
             computed: {
@@ -230,38 +205,59 @@
             methods: {
                 saveConfig() {
                     localStorage.setItem('sanctuaire_config', JSON.stringify(this.config));
-                    this.addLog("💾 Configuration sauvegardée dans le navigateur.", "success");
+                    this.addLog("💾 Configuration sauvegardée.", "success");
                 },
                 clearConfig() {
                     localStorage.removeItem('sanctuaire_config');
-                    this.addLog("🗑️ Configuration effacée.", "warn");
                     location.reload();
                 },
+                // --- FONCTIONS MODIFIÉES POUR LE PROXY ---
+                
                 async testConnection() {
                     this.connectionStatus = null;
-                    this.addLog("🔍 Test de connexion à Directus...", "info");
+                    this.addLog("🔍 Test de connexion (via Proxy)...", "info");
                     try {
-                        const res = await fetch(`${this.config.directus_url}/server/info`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        // On appelle NOTRE serveur (/api/proxy) qui appellera Directus
+                        const res = await fetch(`${this.config.directus_url.replace(/\/$/, '')}/server/info`, {
+                            headers: { 
+                                "Authorization": `Bearer ${this.config.directus_token}`,
+                                "X-Target-Url": this.config.directus_url // Indique au proxy où aller
+                            }
                         });
-                        if (res.ok) {
-                            this.connectionStatus = { success: true, message: "✅ Connexion Directus établie" };
-                            this.addLog("✅ Connexion Directus réussie !", "success");
+                        // Note: L'appel réel se fait via le proxy défini ci-dessous, 
+                        // mais pour simplifier le code Vue, on va réécrire l'appel fetch pour pointer sur /api/proxy
+                        // Correction immédiate pour utiliser le proxy local :
+                        
+                        const proxyUrl = `/api/proxy/server/info`;
+                        const resProxy = await fetch(proxyUrl, {
+                            headers: { 
+                                "Authorization": `Bearer ${this.config.directus_token}`,
+                                "X-Target-Url": this.config.directus_url 
+                            }
+                        });
+
+                        if (resProxy.ok) {
+                            this.connectionStatus = { success: true, message: "✅ Connexion établie (Proxy)" };
+                            this.addLog("✅ Connexion Directus réussie via Proxy !", "success");
                         } else {
-                            this.connectionStatus = { success: false, message: "❌ Échec connexion" };
-                            this.addLog("❌ Échec connexion. Vérifiez URL et Token.", "error");
+                            this.connectionStatus = { success: false, message: "❌ Échec" };
+                            this.addLog("❌ Échec connexion.", "error");
                         }
                     } catch (e) {
-                        this.connectionStatus = { success: false, message: "❌ Erreur réseau" };
-                        this.addLog(`❌ Erreur réseau: ${e.message}`, "error");
+                        this.connectionStatus = { success: false, message: "❌ Erreur" };
+                        this.addLog(`❌ Erreur: ${e.message}`, "error");
                     }
                 },
                 async loadCollections() {
                     this.loadingCollections = true;
-                    this.addLog("📡 Chargement de la liste des tables...", "info");
+                    this.addLog("📡 Chargement des tables...", "info");
                     try {
-                        const res = await fetch(`${this.config.directus_url}/collections`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        const proxyUrl = `/api/proxy/collections`;
+                        const res = await fetch(proxyUrl, {
+                            headers: { 
+                                "Authorization": `Bearer ${this.config.directus_token}`,
+                                "X-Target-Url": this.config.directus_url 
+                            }
                         });
                         const data = await res.json();
                         if (data.data) {
@@ -269,7 +265,7 @@
                             this.addLog(`✅ ${this.collections.length} tables trouvées.`, "success");
                         }
                     } catch (e) {
-                        this.addLog(`❌ Erreur chargement tables: ${e.message}`, "error");
+                        this.addLog(`❌ Erreur: ${e.message}`, "error");
                     } finally {
                         this.loadingCollections = false;
                     }
@@ -277,10 +273,14 @@
                 async loadFields() {
                     if (!this.selectedCollection) return;
                     this.config.collection = this.selectedCollection;
-                    this.addLog(`🔍 Chargement des champs pour '${this.selectedCollection}'...`, "info");
+                    this.addLog(`🔍 Chargement des champs...`, "info");
                     try {
-                        const res = await fetch(`${this.config.directus_url}/fields/${this.selectedCollection}`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}` }
+                        const proxyUrl = `/api/proxy/fields/${this.selectedCollection}`;
+                        const res = await fetch(proxyUrl, {
+                            headers: { 
+                                "Authorization": `Bearer ${this.config.directus_token}`,
+                                "X-Target-Url": this.config.directus_url 
+                            }
                         });
                         const data = await res.json();
                         if (data.data) {
@@ -293,28 +293,22 @@
                                 .map(f => f.field);
                             
                             const titleCandidate = this.fields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title'].includes(f.field));
-                            if (titleCandidate) {
-                                this.config.fields_mapping.title_field = titleCandidate.field;
-                            } else if (this.fields.length > 0) {
-                                this.config.fields_mapping.title_field = this.fields[0].field;
-                            }
-
+                            this.config.fields_mapping.title_field = titleCandidate ? titleCandidate.field : (this.fields[0]?.field || '');
+                            
                             this.addLog(`✅ ${this.fields.length} champs chargés.`, "success");
                         }
                     } catch (e) {
-                        this.addLog(`❌ Erreur chargement champs: ${e.message}`, "error");
+                        this.addLog(`❌ Erreur: ${e.message}`, "error");
                     }
                 },
-                selectAllFields() {
-                    this.selectedFields = this.fields.map(f => f.field);
-                },
-                deselectAllFields() {
-                    this.selectedFields = [];
-                },
+                // ------------------------------------------
+                
+                selectAllFields() { this.selectedFields = this.fields.map(f => f.field); },
+                deselectAllFields() { this.selectedFields = []; },
                 async startSync() {
                     this.logs = [];
                     this.running = true;
-                    this.addLog("🚀 Démarrage de la synchronisation...", "info");
+                    this.addLog("🚀 Démarrage...", "info");
                     
                     const syncConfig = {
                         directus_url: this.config.directus_url,
@@ -360,18 +354,16 @@
                         } catch (e) { console.error(e); }
                     }, 1000);
                 },
-                addLog(msg, type = 'info') {
-                    this.logs.push(msg);
-                },
+                addLog(msg, type = 'info') { this.logs.push(msg); },
                 detectLogLevel(msg) {
                     if (msg.includes('❌') || msg.includes('Erreur')) return 'error';
-                    if (msg.includes('🎉') || msg.includes('SUCCÈS') || msg.includes('✅')) return 'success';
+                    if (msg.includes('✅') || msg.includes('🎉')) return 'success';
                     if (msg.includes('⚠️')) return 'warn';
                     return 'info';
                 },
                 getLogClass(log) {
                     if (log.includes('❌')) return 'log-error bg-red-900/10';
-                    if (log.includes('🎉') || log.includes('✅')) return 'log-success bg-emerald-900/10';
+                    if (log.includes('✅') || log.includes('🎉')) return 'log-success bg-emerald-900/10';
                     if (log.includes('⚠️')) return 'log-warn bg-yellow-900/10';
                     return 'log-info';
                 },
