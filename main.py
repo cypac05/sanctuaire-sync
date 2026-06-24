@@ -28,7 +28,7 @@ class SyncConfig(BaseModel):
     directus_token: str
     zenodo_url: str
     zenodo_token: str
-    collection: str
+    collections: List[str]  # DEVIENT UNE LISTE
     fields_mapping: Dict[str, Any]
 
 # --- Gestion du Cycle de Vie ---
@@ -135,52 +135,71 @@ async def run_sync_process(config: SyncConfig):
         log_message("🔍 Connexion à Directus...")
         async with httpx.AsyncClient(timeout=30.0) as client:
             headers = {"Authorization": f"Bearer {config.directus_token}"}
-            url = f"{config.directus_url}/items/{config.collection}?limit=100"
             
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-            items = resp.json().get('data', [])
-            
-            log_message(f"✅ {len(items)} éléments récupérés.")
-            
-            if not items:
-                log_message("⚠️ Rien à synchroniser.")
-                is_running = False
-                return
+            total_success = 0
+            total_errors = 0
 
-            success_count = 0
-            for i, item in enumerate(items):
-                log_message(f"Traitement {i+1}/{len(items)}...")
-                metadata = prepare_zenodo_metadata(item, config.fields_mapping)
+            # BOUCLE SUR TOUTES LES TABLES SÉLECTIONNÉES
+            for collection_name in config.collections:
+                log_message(f"📂 Traitement de la table : {collection_name}")
                 
-                if metadata:
-                    # Simulation envoi Zenodo
-                    log_message(f"📤 Envoi : {metadata.get('title', 'Sans titre')}")
-                    await asyncio.sleep(0.5) 
-                    log_message(f"✅ Succès.")
-                    success_count += 1
-            
-            log_message(f"🎉 Terminé : {success_count} succès.")
+                try:
+                    url = f"{config.directus_url}/items/{collection_name}?limit=100"
+                    resp = await client.get(url, headers=headers)
+                    resp.raise_for_status()
+                    items = resp.json().get('data', [])
+                    
+                    log_message(f"   ✅ {len(items)} éléments trouvés dans '{collection_name}'.")
+                    
+                    if not items:
+                        log_message(f"   ⚠️ Rien à synchroniser dans '{collection_name}'.")
+                        continue
+
+                    # Boucle sur les items de CETTE table
+                    for i, item in enumerate(items):
+                        # log_message(f"   Traitement {i+1}/{len(items)}...") # Trop verbeux, on garde pour la fin
+                        metadata = prepare_zenodo_metadata(item, config.fields_mapping, collection_name)
+                        
+                        if metadata:
+                            log_message(f"   📤 Envoi : {metadata.get('title', 'Sans titre')} ({collection_name})")
+                            # Simulation Zenodo
+                            await asyncio.sleep(0.2) 
+                            log_message(f"   ✅ Succès.")
+                            total_success += 1
+                        else:
+                            total_errors += 1
+                            
+                except Exception as e:
+                    log_message(f"   ❌ Erreur critique sur la table '{collection_name}': {str(e)}")
+                    total_errors += 1
+
+            log_message(f"🎉 TERMINÉ ! Résumé : {total_success} succès, {total_errors} échecs/ignorés.")
 
     except Exception as e:
-        log_message(f"❌ Erreur critique : {str(e)}")
+        log_message(f"❌ Erreur globale : {str(e)}")
     finally:
         is_running = False
 
-def prepare_zenodo_metadata(item: Dict, mapping: Dict) -> Dict:
+def prepare_zenodo_metadata(item: Dict, mapping: Dict, collection_name: str) -> Dict:
     title_field = mapping.get('title_field')
+    # Sécurité : si le champ titre n'existe pas dans cet item (car champs différents selon tables)
     if not title_field or title_field not in item:
         return None
     
     title = item[title_field]
     desc_parts = []
+    
     for field in mapping.get('selected_fields', []):
-        if field in item and item[field]:
+        # On ajoute le champ seulement s'il existe dans CET item
+        if field in item and item[field] is not None:
             desc_parts.append(f"**{field}**: {item[field]}")
     
+    # Ajout de la collection source dans la description pour traçabilité
+    desc_parts.append(f"**Source**: Table '{collection_name}'")
+    
     return {
-        "title": title,
-        "description": "\n".join(desc_parts) or "Données synchronisées via Sanctuaire Sync",
+        "title": f"[{collection_name}] {title}",
+        "description": "\n".join(desc_parts) if desc_parts else "Données synchronisées via Sanctuaire Sync",
         "upload_type": "dataset",
         "access_right": "open",
         "license": "cc-by-4.0",
