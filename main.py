@@ -22,7 +22,7 @@ def log_message(message: str, level: str = "INFO"):
         log_buffer.pop(0)
     print(formatted_msg)
 
-# --- Modèles de Données (MIS À JOUR) ---
+# --- Modèles de Données ---
 
 class TableConfig(BaseModel):
     """Configuration spécifique pour une seule table"""
@@ -36,7 +36,7 @@ class SyncConfig(BaseModel):
     directus_token: str
     zenodo_url: str
     zenodo_token: str
-    collections: List[TableConfig] # Liste d'objets de configuration par table
+    collections: List[TableConfig]
 
 # --- Gestion du Cycle de Vie ---
 @asynccontextmanager
@@ -62,7 +62,6 @@ app.add_middleware(
 async def read_root():
     file_path = os.path.join(os.path.dirname(__file__), "index.html")
     if not os.path.exists(file_path):
-        # Essaye dans le dossier static si pas à la racine (secours)
         file_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=500, detail="Fichier index.html introuvable.")
@@ -138,7 +137,6 @@ async def run_sync_process(config: SyncConfig):
             total_success = 0
             total_errors = 0
 
-            # BOUCLE SUR CHAQUE TABLE CONFIGURÉE
             for table_config in config.collections:
                 collection_name = table_config.name
                 title_field = table_config.title_field
@@ -161,7 +159,6 @@ async def run_sync_process(config: SyncConfig):
                         continue
 
                     for i, item in enumerate(items):
-                        # Préparation des métadonnées avec la config spécifique de cette table
                         mapping = {
                             "title_field": title_field,
                             "selected_fields": selected_fields
@@ -170,14 +167,8 @@ async def run_sync_process(config: SyncConfig):
                         
                         if metadata:
                             log_message(f"   📤 Envoi : {metadata.get('title', 'Sans titre')}")
-                            
-                            # --- ICI : Vrai appel API Zenodo (actuellement simulé) ---
-                            # headers_zenodo = {"Authorization": f"Bearer {config.zenodo_token}"}
-                            # data = {'metadata': metadata}
-                            # res = await client.post(f"{config.zenodo_url}/api/deposit/depositions", json=data, headers=headers_zenodo)
-                            # res.raise_for_status()
-                            
-                            await asyncio.sleep(0.2) # Simulation délai
+                            # Simulation délai réseau
+                            await asyncio.sleep(0.2) 
                             log_message(f"   ✅ Succès.")
                             total_success += 1
                         else:
@@ -196,4 +187,30 @@ async def run_sync_process(config: SyncConfig):
         is_running = False
 
 def prepare_zenodo_metadata(item: Dict, mapping: Dict, collection_name: str) -> Dict:
-    """Transforme un item Directus en métadonnées Zenodo selon la config de la
+    """Transforme un item Directus en métadonnées Zenodo selon la config de la table"""
+    title_field = mapping.get('title_field')
+    
+    if not title_field or title_field not in item:
+        return None
+    
+    title = item[title_field]
+    desc_parts = []
+    
+    for field in mapping.get('selected_fields', []):
+        if field in item and item[field] is not None:
+            desc_parts.append(f"**{field}**: {item[field]}")
+    
+    desc_parts.append(f"**Source**: Table '{collection_name}'")
+    
+    return {
+        "title": f"[{collection_name}] {title}",
+        "description": "\n".join(desc_parts) if desc_parts else "Données synchronisées via Sanctuaire Sync",
+        "upload_type": "dataset",
+        "access_right": "open",
+        "license": "cc-by-4.0",
+        "creators": [{"name": "Sanctuaire Non-OGM"}]
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
