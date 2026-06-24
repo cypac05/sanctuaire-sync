@@ -22,25 +22,32 @@ def log_message(message: str, level: str = "INFO"):
         log_buffer.pop(0)
     print(formatted_msg)
 
-# --- Modèles de Données ---
+# --- Modèles de Données (MIS À JOUR) ---
+
+class TableConfig(BaseModel):
+    """Configuration spécifique pour une seule table"""
+    name: str
+    title_field: str
+    selected_fields: List[str]
+
 class SyncConfig(BaseModel):
+    """Configuration globale de synchronisation"""
     directus_url: str
     directus_token: str
     zenodo_url: str
     zenodo_token: str
-    collections: List[str]  # DEVIENT UNE LISTE
-    fields_mapping: Dict[str, Any]
+    collections: List[TableConfig] # Liste d'objets de configuration par table
 
 # --- Gestion du Cycle de Vie ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log_message("Démarrage du serveur Sanctuaire Sync (Mode Proxy)...")
+    log_message("Démarrage du serveur Sanctuaire Sync (Mode Proxy Multi-Tables)...")
     yield
     log_message("Arrêt du serveur.")
 
 app = FastAPI(lifespan=lifespan, title="Sanctuaire Sync API")
 
-# --- Middleware CORS (Pour que le navigateur accepte de parler à Python) ---
+# --- Middleware CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,6 +62,9 @@ app.add_middleware(
 async def read_root():
     file_path = os.path.join(os.path.dirname(__file__), "index.html")
     if not os.path.exists(file_path):
+        # Essaye dans le dossier static si pas à la racine (secours)
+        file_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=500, detail="Fichier index.html introuvable.")
     return FileResponse(file_path)
 
@@ -62,34 +72,24 @@ async def read_root():
 async def get_logs():
     return {"logs": log_buffer, "running": is_running}
 
-# --- NOUVEAU : Le Proxy Universel ---
-# Cette route attrape toutes les demandes vers Directus et les transmet
+# --- Route Proxy Universel ---
 @app.api_route("/api/proxy/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_directus(path: str, request: Request):
-    # 1. Récupérer les headers de la demande originale (surtout l'Authorization)
     headers = dict(request.headers)
-    
-    # On retire certains headers qui posent problème en transfert (host, content-length, etc.)
     exclude_headers = ["host", "content-length", "connection", "transfer-encoding", "accept-encoding"]
     clean_headers = {k: v for k, v in headers.items() if k.lower() not in exclude_headers}
     
-    # 2. Récupérer le corps de la demande si présent (pour les POST/PUT)
     body = await request.body()
-    
-    # 3. Reconstruire l'URL cible (Directus)
-    # L'URL de Directus est passée dans un header personnalisé 'X-Target-Url' envoyé par le frontend
     target_base_url = headers.get("x-target-url")
     
     if not target_base_url:
-        raise HTTPException(status_code=400, detail="Header X-Target-Url manquant. Configuration incorrecte.")
+        raise HTTPException(status_code=400, detail="Header X-Target-Url manquant.")
     
-    # Nettoyer l'URL de base (enlever le slash final s'il y en a un)
     target_base_url = target_base_url.rstrip("/")
     target_url = f"{target_base_url}/{path}"
     
     log_message(f"🔄 Proxy : {request.method} {target_url}")
 
-    # 4. Transmettre la demande à Directus
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.request(
@@ -100,7 +100,6 @@ async def proxy_directus(path: str, request: Request):
                 params=request.query_params
             )
             
-            # 5. Renvoyer la réponse de Directus au navigateur
             return JSONResponse(
                 status_code=resp.status_code,
                 content=resp.json() if resp.content else {},
@@ -108,7 +107,7 @@ async def proxy_directus(path: str, request: Request):
             )
         except httpx.ConnectError:
             log_message(f"❌ Impossible de se connecter à {target_base_url}", "ERROR")
-            raise HTTPException(status_code=503, detail=f"Impossible de joindre Directus à l'adresse {target_base_url}")
+            raise HTTPException(status_code=503, detail=f"Impossible de joindre Directus à {target_base_url}")
         except Exception as e:
             log_message(f"❌ Erreur Proxy: {str(e)}", "ERROR")
             raise HTTPException(status_code=500, detail=str(e))
@@ -123,7 +122,7 @@ async def start_sync(config: SyncConfig, background_tasks: BackgroundTasks):
     
     log_buffer.clear()
     log_message("Nouvelle session démarrée")
-    log_message(f"Collection: {config.collection}")
+    log_message(f"Tables à traiter : {[c.name for c in config.collections]}")
     
     is_running = True
     background_tasks.add_task(run_sync_process, config)
@@ -139,9 +138,15 @@ async def run_sync_process(config: SyncConfig):
             total_success = 0
             total_errors = 0
 
-            # BOUCLE SUR TOUTES LES TABLES SÉLECTIONNÉES
-            for collection_name in config.collections:
+            # BOUCLE SUR CHAQUE TABLE CONFIGURÉE
+            for table_config in config.collections:
+                collection_name = table_config.name
+                title_field = table_config.title_field
+                selected_fields = table_config.selected_fields
+                
                 log_message(f"📂 Traitement de la table : {collection_name}")
+                log_message(f"   -> Champ titre : {title_field}")
+                log_message(f"   -> Champs inclus : {len(selected_fields)}")
                 
                 try:
                     url = f"{config.directus_url}/items/{collection_name}?limit=100"
@@ -149,28 +154,38 @@ async def run_sync_process(config: SyncConfig):
                     resp.raise_for_status()
                     items = resp.json().get('data', [])
                     
-                    log_message(f"   ✅ {len(items)} éléments trouvés dans '{collection_name}'.")
+                    log_message(f"   ✅ {len(items)} éléments trouvés.")
                     
                     if not items:
                         log_message(f"   ⚠️ Rien à synchroniser dans '{collection_name}'.")
                         continue
 
-                    # Boucle sur les items de CETTE table
                     for i, item in enumerate(items):
-                        # log_message(f"   Traitement {i+1}/{len(items)}...") # Trop verbeux, on garde pour la fin
-                        metadata = prepare_zenodo_metadata(item, config.fields_mapping, collection_name)
+                        # Préparation des métadonnées avec la config spécifique de cette table
+                        mapping = {
+                            "title_field": title_field,
+                            "selected_fields": selected_fields
+                        }
+                        metadata = prepare_zenodo_metadata(item, mapping, collection_name)
                         
                         if metadata:
-                            log_message(f"   📤 Envoi : {metadata.get('title', 'Sans titre')} ({collection_name})")
-                            # Simulation Zenodo
-                            await asyncio.sleep(0.2) 
+                            log_message(f"   📤 Envoi : {metadata.get('title', 'Sans titre')}")
+                            
+                            # --- ICI : Vrai appel API Zenodo (actuellement simulé) ---
+                            # headers_zenodo = {"Authorization": f"Bearer {config.zenodo_token}"}
+                            # data = {'metadata': metadata}
+                            # res = await client.post(f"{config.zenodo_url}/api/deposit/depositions", json=data, headers=headers_zenodo)
+                            # res.raise_for_status()
+                            
+                            await asyncio.sleep(0.2) # Simulation délai
                             log_message(f"   ✅ Succès.")
                             total_success += 1
                         else:
+                            log_message(f"   ⚠️ Élément ignoré (champ titre manquant).")
                             total_errors += 1
                             
                 except Exception as e:
-                    log_message(f"   ❌ Erreur critique sur la table '{collection_name}': {str(e)}")
+                    log_message(f"   ❌ Erreur critique sur '{collection_name}': {str(e)}")
                     total_errors += 1
 
             log_message(f"🎉 TERMINÉ ! Résumé : {total_success} succès, {total_errors} échecs/ignorés.")
@@ -181,31 +196,4 @@ async def run_sync_process(config: SyncConfig):
         is_running = False
 
 def prepare_zenodo_metadata(item: Dict, mapping: Dict, collection_name: str) -> Dict:
-    title_field = mapping.get('title_field')
-    # Sécurité : si le champ titre n'existe pas dans cet item (car champs différents selon tables)
-    if not title_field or title_field not in item:
-        return None
-    
-    title = item[title_field]
-    desc_parts = []
-    
-    for field in mapping.get('selected_fields', []):
-        # On ajoute le champ seulement s'il existe dans CET item
-        if field in item and item[field] is not None:
-            desc_parts.append(f"**{field}**: {item[field]}")
-    
-    # Ajout de la collection source dans la description pour traçabilité
-    desc_parts.append(f"**Source**: Table '{collection_name}'")
-    
-    return {
-        "title": f"[{collection_name}] {title}",
-        "description": "\n".join(desc_parts) if desc_parts else "Données synchronisées via Sanctuaire Sync",
-        "upload_type": "dataset",
-        "access_right": "open",
-        "license": "cc-by-4.0",
-        "creators": [{"name": "Sanctuaire Non-OGM"}]
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    """Transforme un item Directus en métadonnées Zenodo selon la config de la
