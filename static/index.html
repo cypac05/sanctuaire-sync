@@ -209,7 +209,7 @@
                     selectedCollections: [],
                     activeTable: null, // Table actuellement affichée
                     
-                    // NOUVELLES STRUCTURES DE DONNÉES
+                    // Structures de données pour la configuration par table
                     tableFields: {}, // { "table_A": [fields], "table_B": [fields] }
                     fieldsSelection: {}, // { "table_A": ["field1", "field2"], "table_B": ["field3"] }
                     titleFields: {}, // { "table_A": "title", "table_B": "name" }
@@ -225,7 +225,6 @@
                     try {
                         const parsed = JSON.parse(saved);
                         this.config = { ...this.config, ...parsed };
-                        // Restaurer les sélections si elles existent
                         if(parsed.fieldsSelection) this.fieldsSelection = parsed.fieldsSelection;
                         if(parsed.titleFields) this.titleFields = parsed.titleFields;
                         if(parsed.selectedCollections) this.selectedCollections = parsed.selectedCollections;
@@ -239,7 +238,6 @@
                         !this.config.zenodo_url || !this.config.zenodo_token ||
                         this.selectedCollections.length === 0) return false;
                     
-                    // Vérifier que chaque table sélectionnée a des champs et un titre
                     for (let table of this.selectedCollections) {
                         if (!this.fieldsSelection[table] || this.fieldsSelection[table].length === 0) return false;
                         if (!this.titleFields[table]) return false;
@@ -305,9 +303,8 @@
                         this.loadingCollections = false;
                     }
                 },
-                // Watcher pour charger les champs quand une table est cochée/décochée
                 async handleCollectionChange() {
-                    // Si on décoche une table, on nettoie ses données
+                    // Nettoyage des données des tables décochées
                     for (let table of Object.keys(this.tableFields)) {
                         if (!this.selectedCollections.includes(table)) {
                             delete this.tableFields[table];
@@ -316,14 +313,14 @@
                         }
                     }
                     
-                    // Si on a des tables sélectionnées et pas de table active, on prend la première
+                    // Gestion de la table active
                     if (this.selectedCollections.length > 0 && !this.activeTable) {
                         this.activeTable = this.selectedCollections[0];
                     } else if (this.selectedCollections.length === 0) {
                         this.activeTable = null;
                     }
 
-                    // Charger les champs pour les nouvelles tables sélectionnées qui n'ont pas encore de données
+                    // Chargement des champs pour les nouvelles tables
                     for (let table of this.selectedCollections) {
                         if (!this.tableFields[table]) {
                             await this.loadFieldsForTable(table);
@@ -347,21 +344,20 @@
                                 return true;
                             });
 
-                            this.$set(this.tableFields, table, filteredFields);
+                            // CORRECTION VUE 3 : Assignation directe au lieu de this.$set
+                            this.tableFields[table] = filteredFields;
                             
-                            // Initialiser la sélection si elle n'existe pas
                             if (!this.fieldsSelection[table]) {
                                 const commonFields = ['Nom', 'Name', 'Description', 'Notes', 'acc_spiece', 'acc_name_of_accession', 'title', 'email'];
                                 const preSelected = filteredFields
                                     .filter(f => commonFields.some(cf => f.field.toLowerCase().includes(cf.toLowerCase())))
                                     .map(f => f.field);
-                                this.$set(this.fieldsSelection, table, preSelected.length > 0 ? preSelected : (filteredFields.length > 0 ? [filteredFields[0].field] : []));
+                                this.fieldsSelection[table] = preSelected.length > 0 ? preSelected : (filteredFields.length > 0 ? [filteredFields[0].field] : []);
                             }
                             
-                            // Initialiser le titre si inexistant
                             if (!this.titleFields[table]) {
                                 const titleCandidate = filteredFields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title', 'email'].includes(f.field));
-                                this.$set(this.titleFields, table, titleCandidate ? titleCandidate.field : (filteredFields[0]?.field || ''));
+                                this.titleFields[table] = titleCandidate ? titleCandidate.field : (filteredFields[0]?.field || '');
                             }
 
                             this.addLog(`✅ Champs chargés pour '${table}'.`, "success");
@@ -385,7 +381,6 @@
                     this.running = true;
                     this.addLog("🚀 Démarrage de la synchronisation...", "info");
                     
-                    // Construire la configuration détaillée par table
                     const collectionsConfig = this.selectedCollections.map(table => ({
                         name: table,
                         title_field: this.titleFields[table],
