@@ -270,14 +270,19 @@
                         });
                         const data = await res.json();
                         if (data.data) {
-                            this.collections = data.data;
+                             this.collections = data.data.filter(col => {
+                                const name = col.collection;
+                                if (name === 'directus_users') return true; // Exception autorisée
+                                if (name.startsWith('directus_')) return false; // Exclusion système
+                                return true; // On garde le reste
+                             });
                             this.addLog(`✅ ${this.collections.length} tables trouvées.`, "success");
                         }
                     } catch (e) {
                         this.addLog(`❌ Erreur: ${e.message}`, "error");
-                    } finally {
-                        this.loadingCollections = false;
-                    }
+                       } finally {
+                            this.loadingCollections = false;
+                   }
                 },
                 selectAllCollections() {
                     this.selectedCollections = this.collections.map(c => c.collection);
