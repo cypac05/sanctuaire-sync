@@ -45,7 +45,7 @@
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Proxy Universel Activé</p>
+                        <p class="text-xs text-slate-400">Sélection Multi-Tables & Proxy</p>
                     </div>
                 </div>
                 <div class="flex space-x-2">
@@ -64,7 +64,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
                         <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
-                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: http://localhost:8061 ou https://db.monsite.com)">
+                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: http://localhost:8061)">
                         <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Token Admin">
                     </div>
                     <div class="space-y-4">
@@ -87,6 +87,7 @@
                     <span class="mr-2">📂</span> Sélection des Données
                 </h2>
                 
+                <!-- Étape 1 : Charger les tables -->
                 <div class="mb-6">
                     <button @click="loadCollections" :disabled="loadingCollections" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm transition flex items-center disabled:opacity-50">
                         <span v-if="loadingCollections" class="spinner w-4 h-4 border-2 border-white/30 border-t-white mr-2"></span>
@@ -94,27 +95,48 @@
                     </button>
                 </div>
 
+                <!-- Étape 2 : Choisir les tables (MULTIPLE) -->
                 <div v-if="collections.length > 0" class="mb-6 p-4 bg-slate-900 rounded border border-slate-700">
-                    <label class="block text-sm text-slate-400 mb-2">2. Choisissez la collection :</label>
-                    <select v-model="selectedCollection" @change="loadFields" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white focus:border-indigo-500 outline-none">
-                        <option value="" disabled>-- Sélectionner --</option>
-                        <option v-for="col in collections" :key="col.collection" :value="col.collection">
-                            {{ col.collection }} {{ col.meta?.note ? '(' + col.meta.note + ')' : '' }}
-                        </option>
-                    </select>
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="block text-sm text-slate-400">2. Cochez les collections à synchroniser :</label>
+                        <div class="space-x-2">
+                            <button @click="selectAllCollections" class="text-xs text-indigo-400 hover:underline">Tout</button>
+                            <button @click="deselectAllCollections" class="text-xs text-slate-400 hover:underline">Aucun</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-48 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll">
+                        <label v-for="col in collections" :key="col.collection" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-3 rounded border border-slate-800">
+                            <input type="checkbox" :value="col.collection" v-model="selectedCollections" class="hidden">
+                            <div class="text-sm text-slate-300 font-bold break-all">
+                                {{ col.collection }}
+                                <span v-if="col.meta?.note" class="block text-[10px] text-slate-500 font-normal truncate">{{ col.meta.note }}</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 text-right">
+                        {{ selectedCollections.length }} table(s) sélectionnée(s)
+                    </div>
                 </div>
 
-                <div v-if="fields.length > 0" class="p-4 bg-slate-900 rounded border border-slate-700">
-                    <div class="flex justify-between items-center mb-4">
-                        <label class="block text-sm text-slate-400">3. Champs à inclure :</label>
+                <!-- Étape 3 : Choisir les champs (S'applique à toutes les tables sélectionnées) -->
+                <div v-if="selectedCollections.length > 0" class="p-4 bg-slate-900 rounded border border-slate-700">
+                    <div class="mb-4 p-3 bg-indigo-900/20 border border-indigo-500/30 rounded text-xs text-indigo-200">
+                        ℹ️ Les champs sélectionnés ci-dessous s'appliqueront à <strong>toutes</strong> les tables cochées. 
+                        <br>Si un champ n'existe pas dans une table, il sera ignoré pour celle-ci.
+                    </div>
+
+                    <div class="flex justify-between items-center mb-4" v-if="currentFields.length > 0">
+                        <label class="block text-sm text-slate-400">3. Champs à inclure (Aperçu : {{ selectedCollections[0] }}) :</label>
                         <div class="space-x-2">
                             <button @click="selectAllFields" class="text-xs text-indigo-400 hover:underline">Tout</button>
                             <button @click="deselectAllFields" class="text-xs text-slate-400 hover:underline">Aucun</button>
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll">
-                        <label v-for="field in fields" :key="field.field" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
+                    <!-- Affichage des champs de la PREMIÈRE table sélectionnée comme référence -->
+                    <div v-if="currentFields.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll">
+                        <label v-for="field in currentFields" :key="field.field" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
                             <input type="checkbox" :value="field.field" v-model="selectedFields" class="hidden">
                             <div class="text-xs text-slate-300 break-all">
                                 <span class="font-bold text-indigo-300">{{ field.field }}</span>
@@ -122,11 +144,12 @@
                             </div>
                         </label>
                     </div>
+                    <div v-else class="text-sm text-slate-500 italic">Sélectionnez d'abord une table pour voir les champs.</div>
                     
-                    <div class="mt-4 pt-4 border-t border-slate-800">
-                        <label class="block text-sm text-slate-400 mb-1">Champ TITRE du DOI :</label>
+                    <div class="mt-4 pt-4 border-t border-slate-800" v-if="currentFields.length > 0">
+                        <label class="block text-sm text-slate-400 mb-1">Champ TITRE principal (pour toutes les tables) :</label>
                         <select v-model="config.fields_mapping.title_field" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full md:w-1/2">
-                            <option v-for="field in fields" :key="field.field" :value="field.field">{{ field.field }}</option>
+                            <option v-for="field in currentFields" :key="field.field" :value="field.field">{{ field.field }}</option>
                         </select>
                     </div>
                 </div>
@@ -171,14 +194,14 @@
                         directus_token: '',
                         zenodo_url: 'https://sandbox.zenodo.org',
                         zenodo_token: '',
-                        collection: '',
                         fields_mapping: { title_field: '', selected_fields: [] }
                     },
                     connectionStatus: null,
                     loadingCollections: false,
                     collections: [],
-                    selectedCollection: '',
-                    fields: [],
+                    selectedCollections: [], // DEVIENT UN TABLEAU
+                    currentFields: [], // Champs de la table actuellement affichée en aperçu
+                    fields: [], // Tous les champs chargés (de la première table pour l'instant)
                     selectedFields: [],
                     logs: [],
                     running: false,
@@ -197,7 +220,7 @@
             computed: {
                 isReadyToSync() {
                     return this.config.directus_url && this.config.directus_token && 
-                           this.selectedCollection && this.selectedFields.length > 0 && 
+                           this.selectedCollections.length > 0 && this.selectedFields.length > 0 && 
                            this.config.fields_mapping.title_field &&
                            this.config.zenodo_url && this.config.zenodo_token;
                 }
@@ -211,32 +234,18 @@
                     localStorage.removeItem('sanctuaire_config');
                     location.reload();
                 },
-                // --- FONCTIONS MODIFIÉES POUR LE PROXY ---
-                
                 async testConnection() {
                     this.connectionStatus = null;
                     this.addLog("🔍 Test de connexion (via Proxy)...", "info");
                     try {
-                        // On appelle NOTRE serveur (/api/proxy) qui appellera Directus
-                        const res = await fetch(`${this.config.directus_url.replace(/\/$/, '')}/server/info`, {
-                            headers: { 
-                                "Authorization": `Bearer ${this.config.directus_token}`,
-                                "X-Target-Url": this.config.directus_url // Indique au proxy où aller
-                            }
-                        });
-                        // Note: L'appel réel se fait via le proxy défini ci-dessous, 
-                        // mais pour simplifier le code Vue, on va réécrire l'appel fetch pour pointer sur /api/proxy
-                        // Correction immédiate pour utiliser le proxy local :
-                        
                         const proxyUrl = `/api/proxy/server/info`;
-                        const resProxy = await fetch(proxyUrl, {
+                        const res = await fetch(proxyUrl, {
                             headers: { 
                                 "Authorization": `Bearer ${this.config.directus_token}`,
                                 "X-Target-Url": this.config.directus_url 
                             }
                         });
-
-                        if (resProxy.ok) {
+                        if (res.ok) {
                             this.connectionStatus = { success: true, message: "✅ Connexion établie (Proxy)" };
                             this.addLog("✅ Connexion Directus réussie via Proxy !", "success");
                         } else {
@@ -270,12 +279,28 @@
                         this.loadingCollections = false;
                     }
                 },
-                async loadFields() {
-                    if (!this.selectedCollection) return;
-                    this.config.collection = this.selectedCollection;
-                    this.addLog(`🔍 Chargement des champs...`, "info");
+                selectAllCollections() {
+                    this.selectedCollections = this.collections.map(c => c.collection);
+                },
+                deselectAllCollections() {
+                    this.selectedCollections = [];
+                    this.currentFields = [];
+                    this.fields = [];
+                    this.selectedFields = [];
+                },
+                // Quand on change la sélection de tables, on met à jour l'aperçu des champs
+                // Pour simplifier, on charge les champs de la PREMIÈRE table sélectionnée pour servir de modèle
+                async loadFields() { 
+                    // Cette fonction est maintenant appelée automatiquement quand selectedCollections change via un watcher ou manuellement
+                    if (this.selectedCollections.length === 0) {
+                        this.currentFields = [];
+                        return;
+                    }
+                    const firstTable = this.selectedCollections[0];
+                    this.addLog(`🔍 Chargement des champs de référence pour '${firstTable}'...`, "info");
+                    
                     try {
-                        const proxyUrl = `/api/proxy/fields/${this.selectedCollection}`;
+                        const proxyUrl = `/api/proxy/fields/${firstTable}`;
                         const res = await fetch(proxyUrl, {
                             headers: { 
                                 "Authorization": `Bearer ${this.config.directus_token}`,
@@ -286,7 +311,9 @@
                         if (data.data) {
                             const systemFields = ['date_created', 'date_updated', 'user_created', 'user_updated', 'sort', 'id'];
                             this.fields = data.data.filter(f => !systemFields.includes(f.field));
+                            this.currentFields = this.fields; // Pour l'affichage
                             
+                            // Pré-sélection intelligente
                             const commonFields = ['Nom', 'Name', 'Description', 'Notes', 'acc_spiece', 'acc_name_of_accession'];
                             this.selectedFields = this.fields
                                 .filter(f => commonFields.some(cf => f.field.toLowerCase().includes(cf.toLowerCase())))
@@ -295,27 +322,27 @@
                             const titleCandidate = this.fields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title'].includes(f.field));
                             this.config.fields_mapping.title_field = titleCandidate ? titleCandidate.field : (this.fields[0]?.field || '');
                             
-                            this.addLog(`✅ ${this.fields.length} champs chargés.`, "success");
+                            this.addLog(`✅ Champs chargés depuis '${firstTable}'.`, "success");
                         }
                     } catch (e) {
-                        this.addLog(`❌ Erreur: ${e.message}`, "error");
+                        this.addLog(`❌ Erreur champs: ${e.message}`, "error");
                     }
                 },
-                // ------------------------------------------
-                
-                selectAllFields() { this.selectedFields = this.fields.map(f => f.field); },
+                selectAllFields() { this.selectedFields = this.currentFields.map(f => f.field); },
                 deselectAllFields() { this.selectedFields = []; },
+                
                 async startSync() {
                     this.logs = [];
                     this.running = true;
-                    this.addLog("🚀 Démarrage...", "info");
+                    this.addLog("🚀 Démarrage de la synchronisation multi-tables...", "info");
+                    this.addLog(`📂 Tables : ${this.selectedCollections.join(', ')}`, "info");
                     
                     const syncConfig = {
                         directus_url: this.config.directus_url,
                         directus_token: this.config.directus_token,
                         zenodo_url: this.config.zenodo_url,
                         zenodo_token: this.config.zenodo_token,
-                        collection: this.selectedCollection,
+                        collections: this.selectedCollections, // ENVOIE LE TABLEAU
                         fields_mapping: {
                             title_field: this.config.fields_mapping.title_field,
                             selected_fields: this.selectedFields
@@ -371,6 +398,17 @@
                     this.$nextTick(() => {
                         if (this.$refs.logContainer) this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
                     });
+                }
+            },
+            watch: {
+                // Quand la sélection de tables change, on recharge les champs de la première table sélectionnée
+                selectedCollections: {
+                    handler() {
+                        if (this.selectedCollections.length > 0) {
+                            this.loadFields();
+                        }
+                    },
+                    deep: true
                 }
             }
         }).mount('#app');
