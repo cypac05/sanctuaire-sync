@@ -166,11 +166,35 @@ async def run_sync_process(config: SyncConfig):
                         metadata = prepare_zenodo_metadata(item, mapping, collection_name)
                         
                         if metadata:
-                            log_message(f"   📤 Envoi : {metadata.get('title', 'Sans titre')}")
-                            # Simulation délai réseau
-                            await asyncio.sleep(0.2) 
-                            log_message(f"   ✅ Succès.")
+                            log_message(f"   📤 Envoi vers Zenodo : {metadata.get('title', 'Sans titre')}")
+    
+                        try:
+                            # 1. Préparer la requête
+                            headers_zenodo = {"Authorization": f"Bearer {config.zenodo_token}"}
+                            data = {'metadata': metadata}
+        
+                                # 2. Envoyer à l'API Zenodo pour créer un brouillon (Deposition)
+                                async with httpx.AsyncClient(timeout=30.0) as zenodo_client:
+                                res = await zenodo_client.post(
+                                f"{config.zenodo_url}/api/deposit/depositions", 
+                                json=data, 
+                                headers=headers_zenodo
+                             )
+            
+                            # 3. Vérifier la réponse
+                            res.raise_for_status()
+                            result = res.json()
+            
+                            deposition_id = result.get('id')
+                            html_link = result.get('links', {}).get('html', 'Inconnu')
+            
+                            log_message(f"   ✅ Dépôt créé ! ID: {deposition_id}")
+                            log_message(f"   🔗 Lien : {html_link}")
                             total_success += 1
+            
+                    except Exception as zenodo_err:
+                        log_message(f"   ❌ Erreur Zenodo : {str(zenodo_err)}")
+                        total_errors += 1
                         else:
                             log_message(f"   ⚠️ Élément ignoré (champ titre manquant).")
                             total_errors += 1
