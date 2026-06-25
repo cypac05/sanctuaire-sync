@@ -1,13 +1,11 @@
 import os
 import asyncio
-import logging
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
-from urllib.parse import urljoin
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import httpx
 
@@ -158,6 +156,7 @@ async def run_sync_process(config: SyncConfig):
                         log_message(f"   ⚠️ Rien à synchroniser dans '{collection_name}'.")
                         continue
 
+                    # BOUCLE SUR CHAQUE ÉLÉMENT
                     for i, item in enumerate(items):
                         mapping = {
                             "title_field": title_field,
@@ -165,36 +164,37 @@ async def run_sync_process(config: SyncConfig):
                         }
                         metadata = prepare_zenodo_metadata(item, mapping, collection_name)
                         
+                        # --- BLOC CORRIGÉ : L'envoi est bien à l'intérieur du IF ---
                         if metadata:
                             log_message(f"   📤 Envoi vers Zenodo : {metadata.get('title', 'Sans titre')}")
-    
-                        try:
-                            # 1. Préparer la requête
-                            headers_zenodo = {"Authorization": f"Bearer {config.zenodo_token}"}
-                            data = {'metadata': metadata}
-        
-                                # 2. Envoyer à l'API Zenodo pour créer un brouillon (Deposition)
+                            
+                            try:
+                                # 1. Préparer la requête
+                                headers_zenodo = {"Authorization": f"Bearer {config.zenodo_token}"}
+                                data = {'metadata': metadata}
+            
+                                # 2. Envoyer à l'API Zenodo
                                 async with httpx.AsyncClient(timeout=30.0) as zenodo_client:
-                                res = await zenodo_client.post(
-                                f"{config.zenodo_url}/api/deposit/depositions", 
-                                json=data, 
-                                headers=headers_zenodo
-                             )
-            
-                            # 3. Vérifier la réponse
-                            res.raise_for_status()
-                            result = res.json()
-            
-                            deposition_id = result.get('id')
-                            html_link = result.get('links', {}).get('html', 'Inconnu')
-            
-                            log_message(f"   ✅ Dépôt créé ! ID: {deposition_id}")
-                            log_message(f"   🔗 Lien : {html_link}")
-                            total_success += 1
-            
-                    except Exception as zenodo_err:
-                        log_message(f"   ❌ Erreur Zenodo : {str(zenodo_err)}")
-                        total_errors += 1
+                                    res = await zenodo_client.post(
+                                        f"{config.zenodo_url}/api/deposit/depositions", 
+                                        json=data, 
+                                        headers=headers_zenodo
+                                    )
+                                    
+                                    # 3. Vérifier la réponse
+                                    res.raise_for_status()
+                                    result = res.json()
+                                    
+                                    deposition_id = result.get('id')
+                                    html_link = result.get('links', {}).get('html', 'Inconnu')
+                                    
+                                    log_message(f"   ✅ Dépôt créé ! ID: {deposition_id}")
+                                    log_message(f"   🔗 Lien : {html_link}")
+                                    total_success += 1
+                                    
+                            except Exception as zenodo_err:
+                                log_message(f"   ❌ Erreur Zenodo : {str(zenodo_err)}")
+                                total_errors += 1
                         else:
                             log_message(f"   ⚠️ Élément ignoré (champ titre manquant).")
                             total_errors += 1
