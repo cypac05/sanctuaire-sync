@@ -21,6 +21,30 @@ Vous devez avoir une instance Directus fonctionnelle avec :
     Les collections contenant vos données.
     (Optionnel mais recommandé) Des champs de type "Fichier" ou "Image" pour les illustrations.
 
+⚙️ Configuration dans Directus
+
+Pour que la synchronisation fonctionne et que les références soient sauvegardées en retour, vous devez ajouter deux champs spécifiques dans chaque collection à synchroniser.
+A. Champs de Contenu (Source)
+
+Ces champs contiennent les données à envoyer :
+
+    Champ Titre : Un champ texte (ex: nom_variete, titre_projet).
+    Champs Descriptifs : Tous les champs texte que vous souhaitez voir apparaître dans la notice Zenodo.
+    Champs Images : Un ou deux champs de type Fichier ou Image (Interface: file-input ou image).
+
+B. Champs de Retour (Destination) - OBLIGATOIRES
+
+Ces champs sont nécessaires pour que Sanctuaire Sync puisse enregistrer le résultat de l'export dans Directus après la création du dépôt Zenodo. Créez-les dans chaque collection concernée :
+Nom du Champ (Slug)	Type	Interface	Rôle
+zenodo_doi	String	Input	Reçoit le DOI unique (ex: 10.5072/zenodo.12345) après publication.
+zenodo_record_url	String	Input	Reçoit l'URL directe vers le dépôt (ex: https://sandbox.zenodo.org/record/12345).
+
+    Note importante : Actuellement, l'outil crée les dépôts en mode "Brouillon" sur Zenodo. Le DOI final n'est attribué qu'au moment de la publication (bouton "Submit" sur le site Zenodo).
+
+        Option 1 (Manuelle) : Vous publiez sur Zenodo, copiez le DOI et l'URL, et les collez dans Directus.
+        Option 2 (Automatique - À venir) : Une future mise à jour pourra écrire automatiquement ces champs via l'API Directus après la publication.
+
+
 2. Côté Zenodo
 
     Un compte sur Zenodo ou Zenodo Sandbox (pour les tests).
