@@ -1,103 +1,128 @@
-# sanctuaire-sync
-outil de preuve d'antériorité semences avec l'interface directus
-# 🌱 Sanctuaire Non-OGM – Outil de Synchronisation Zenodo
+🌱 Sanctuaire Sync
 
-Outil autonome et sécurisé pour sanctuariser vos collections de semences (Directus) sur la plateforme **Zenodo** (CERN). Il génère automatiquement des **DOI** (Digital Object Identifiers) et des fichiers de preuve horodatés pour établir une **antériorité incontestable** face aux brevets sur le vivant.
+Sanctuaire Sync est un outil de synchronisation automatique conçu pour exporter des données depuis une instance Directus vers Zenodo (ou Zenodo Sandbox). Il permet de créer des dépôts scientifiques (datasets) complets, incluant les métadonnées structurées et les fichiers images associés, le tout en respectant les principes de science ouverte.
+✨ Fonctionnalités
 
-## ✨ Fonctionnalités
+    Sélection Multi-Tables : Synchronisez plusieurs collections Directus en une seule fois.
+    Configuration Granulaire : Pour chaque table, définissez indépendamment :
+        Le champ utilisé comme Titre du dépôt Zenodo.
+        Les champs à inclure dans la Description.
+        Jusqu'à deux champs Images à joindre automatiquement au dépôt.
+    Proxy CORS Intégré : Contourne les restrictions de sécurité des navigateurs pour se connecter à n'importe quelle instance Directus (locale ou distante) sans configuration serveur complexe.
+    Gestion Intelligente des Images : Détection automatique des types de champs, téléchargement sécurisé depuis Directus et upload vers Zenodo.
+    Sauvegarde Locale : Votre configuration (URL, tokens, sélections) est sauvegardée dans votre navigateur pour une utilisation ultérieure rapide.
 
-*   **Preuve d'Antériorité Juridique** : Chaque accession reçoit un DOI unique et inaltérable hébergé par le CERN.
-*   **Fichier de Preuve Automatique** : Génération et upload d'un fichier texte contenant l'empreinte exacte des données à l'instant T.
-*   **Synchronisation Bidirectionnelle** : Mise à jour automatique de votre base Directus avec les DOI et liens Zenodo.
-*   **100% Local & Sécurisé** : L'outil s'exécute sur votre machine. Vos tokens et données sensibles ne transitent que vers Zenodo/Directus.
-*   **Multi-Plateforme** : Compatible Windows, macOS et Linux.
-*   **Zéro Configuration Complexe** : Installation automatique des dépendances au premier lancement.
+📋 Prérequis
+1. Côté Directus
 
----
+Vous devez avoir une instance Directus fonctionnelle avec :
 
-## 🚀 Installation & Lancement (3 étapes)
+    Un Token Admin (ou un token utilisateur avec accès en lecture aux collections et aux fichiers).
+    Les collections contenant vos données.
+    (Optionnel mais recommandé) Des champs de type "Fichier" ou "Image" pour les illustrations.
 
-### 1. Prérequis : Python
-Vous devez avoir **Python** installé sur votre ordinateur.
-*   📥 [Télécharger Python ici](https://www.python.org/downloads/)
-*   ⚠️ **IMPORTANT (Windows)** : Lors de l'installation, cochez impérativement la case **"Add Python to PATH"** en bas de la fenêtre.
+2. Côté Zenodo
 
-### 2. Téléchargement de l'outil
-1.  Cliquez sur le bouton vert **`<> Code`** en haut de cette page.
-2.  Cliquez sur **`Download ZIP`**.
-3.  **Extrayez** (dézippez) le dossier téléchargé sur votre **Bureau**.
-    *   *Le dossier doit s'appeler `sanctuaire-sync-main` (ou similaire).*
+    Un compte sur Zenodo ou Zenodo Sandbox (pour les tests).
+    Un Token API personnel :
+        Allez dans Settings > Applications > Create new token.
+        Donnez-lui un nom (ex: Sanctuaire Sync).
+        Cochez les permissions : deposit:actions et deposit:write.
+        Copiez le token généré.
 
-### 3. Lancement
-Ouvrez le dossier extrait et double-cliquez sur le fichier correspondant à votre système :
+3. Côté Système
 
-*   🪟 **Windows** : Double-cliquez sur **`Lancer.bat`**.
-    *   *Au premier lancement, un raccourci "Sanctuaire Non-OGM" sera créé automatiquement sur votre bureau.*
-*   🍎 **macOS** / 🐧 **Linux** : Ouvrez un terminal dans le dossier et tapez :
-    ```bash
-    chmod +x Lancer.sh
-    ./Lancer.sh
-    ```
+    Python 3.8 ou supérieur.
+    Git (pour cloner le dépôt).
 
-🌐 L'application s'ouvrira automatiquement dans votre navigateur à l'adresse `http://localhost:8765`.
+🚀 Installation et Démarrage
+1. Cloner le projet
 
----
+bash
+git clone https://github.com/cypac05/sanctuaire-sync.git
+cd sanctuaire-sync
 
-## 📖 Comment l'utiliser ?
+2. Créer un environnement virtuel
 
-Une fois l'interface ouverte dans votre navigateur :
+bash
+# Sur Mac/Linux
+python3 -m venv venv
+source venv/bin/activate
 
-1.  **Configuration Directus** :
-    *   **URL** : L'adresse de votre instance (ex: `http://localhost:8058` ou `https://db.monsite.com`).
-    *   **Token** : Votre token d'administration Directus (créé dans votre profil utilisateur).
-2.  **Configuration Zenodo** :
-    *   **URL** : `https://sandbox.zenodo.org` (pour tester) ou `https://zenodo.org` (pour la production).
-    *   **Token** : Votre token d'application Zenodo (créé dans *Settings > Applications*).
-3.  **Sélection des Données** :
-    *   **Collection** : Le nom de la table dans Directus (ex: `Variete`, `Accessions`).
-    *   **Champ Titre** : Le champ à utiliser comme nom principal (ex: `Nom`).
-4.  **Lancement** :
-    *   Cliquez sur **🚀 Lancer la Synchronisation**.
-    *   Suivez la progression en temps réel dans la console.
-    *   À la fin, vos items dans Directus auront un nouveau DOI et un lien vers la preuve publique.
+# Sur Windows
+python -m venv venv
+venv\Scripts\activate
 
-> **Note** : L'outil ignore automatiquement les items qui possèdent déjà un DOI (champ `zenodo_doi` rempli).
+3. Installer les dépendances
 
----
+bash
+pip install -r requirements.txt
 
-## 🛑 Comment arrêter l'application ?
+Note : Si vous rencontrez une erreur httpx, installez-le manuellement : pip install httpx.
+4. Lancer le serveur
 
-*   Fermez simplement la **fenêtre noire (terminal)** qui s'est ouverte lors du lancement.
-*   Le serveur s'arrêtera immédiatement.
+bash
+python main.py
 
----
+Le serveur démarre sur http://localhost:8000.
+5. Ouvrir l'interface
 
-## 🔒 Sécurité & Confidentialité
+Ouvrez votre navigateur et allez sur : http://localhost:8000
+⚙️ Configuration dans Directus
 
-*   **Tokens** : Vos tokens API sont utilisés uniquement en mémoire locale pour la session en cours. Ils ne sont jamais stockés dans le code ni envoyés à un serveur tiers.
-*   **Données** : Aucune donnée n'est collectée par les développeurs de cet outil. Tout reste entre votre machine, votre instance Directus et Zenodo.
-*   **Code Open Source** : Le code est auditable publiquement sur ce dépôt GitHub.
+Pour que la synchronisation fonctionne optimalement, assurez-vous que vos collections Directus sont structurées comme suit. Aucune modification technique n'est requise dans le schéma, mais la présence de certains champs est nécessaire pour l'export.
+Champs Recommandés (Métadonnées)
 
----
+Bien que l'outil puisse utiliser n'importe quel champ texte, il est recommandé d'avoir :
 
-## 🛠️ Dépannage (FAQ)
+    Un champ Titre (Type: String ou Input) : Pour identifier clairement l'élément.
+    Un champ Description (Type: Text ou Textarea) : Pour le résumé scientifique.
+    Des champs spécifiques à votre domaine (ex: Nom_Latin, Lieu_Origine, Date_Recolte).
 
-**❌ Erreur : "Python n'est pas reconnu"**
-*   Vous n'avez pas coché "Add Python to PATH" lors de l'installation. Désinstallez Python, réinstallez-le en cochant la case, et réessayez.
+Champs Requis pour les Images
 
-**❌ Erreur : "Port déjà utilisé"**
-*   Une autre instance de l'application est déjà ouverte. Fermez la fenêtre terminal correspondante ou changez de port dans le code `main.py`.
+Pour utiliser la fonctionnalité d'upload d'images, vous devez avoir dans votre collection au moins un champ de type Fichier ou Image.
 
-**❌ Erreur : "Permission denied" (Zenodo)**
-*   Votre token Zenodo n'a pas les droits suffisants. Vérifiez qu'il a bien les scopes `deposit:actions` et `deposit:write`.
+    Type de champ : Dans Directus, le type doit être UUID (pour la relation) et l'interface doit être File Input ou Image.
+    Configuration : L'outil détecte automatiquement ces champs dans la liste déroulante de configuration (filtrée par l'icône 📷).
 
-**❌ Erreur : "CORS" ou connexion refusée**
-*   Vérifiez que l'URL de votre Directus est correcte et accessible depuis votre navigateur.
+    Note : Si vos champs images n'apparaissent pas dans la liste déroulante de l'interface Sanctuaire Sync, vérifiez dans Directus que leur interface est bien définie sur file-input, file-image ou image.
 
----
+📖 Utilisation
 
-## 📄 Licence
+    Connexion :
+        Entrez l'URL de votre Directus (ex: https://directus.monsite.com) et le Token.
+        Entrez l'URL de Zenodo (https://sandbox.zenodo.org pour tester) et le Token API.
+        Cliquez sur Tester la connexion.
 
-Ce projet est distribué sous licence **MIT**. Vous êtes libre de l'utiliser, le modifier et le distribuer pour vos propres projets de souveraineté semencière.
+    Sélection des Tables :
+        Cliquez sur Charger la liste des tables.
+        Cochez les collections que vous souhaitez exporter.
 
-*Développé pour le projet Sanctuaire Non-OGM.*
+    Configuration par Table :
+        Cliquez sur l'onglet d'une table sélectionnée.
+        Champs de données : Cochez les champs à inclure dans la description du dépôt.
+        Champ Titre : Sélectionnez le champ qui servira de titre principal.
+        Champ Image 1 / Image 2 : Sélectionnez les champs contenant les images à joindre (la liste ne montre que les champs compatibles).
+        Répétez pour chaque table.
+
+    Lancement :
+        Cliquez sur 🚀 Lancer la Sync.
+        Suivez la progression dans le terminal intégré.
+        Une fois terminé, connectez-vous à Zenodo pour vérifier vos brouillons ("Drafts").
+
+🛠️ Dépannage
+
+    Erreur 404 sur Directus : Vérifiez que l'URL ne se termine pas par un slash / (ex: utilisez https://.../api et non https://.../api/). L'outil tente de corriger cela automatiquement, mais une URL propre est préférable.
+    Erreur "Illegal header value" : Cela vient souvent d'espaces invisibles dans le Token Zenodo. Régénérez un token et copiez-le soigneusement. L'outil applique maintenant un nettoyage automatique (.strip()).
+    Les images ne s'uploadent pas : Vérifiez que le token Directus a bien les droits de lecture sur la table directus_files (ou que les images sont publiques). Les logs indiqueront "Échec upload image" avec la raison précise.
+    Rien n'apparaît dans Zenodo : Assurez-vous d'utiliser le bon environnement (Sandbox vs Production). Un dépôt créé sur Sandbox n'apparaîtra pas sur le site principal de Zenodo.
+
+📄 Licence
+
+Ce projet est distribué sous licence MIT.
+🤝 Contributeurs
+
+Développé pour le projet Sanctuaire Non-OGM. Basé sur les technologies FastAPI, Vue.js 3, TailwindCSS et les API Directus & Zenodo.
+Prochaine étape suggérée :
+
