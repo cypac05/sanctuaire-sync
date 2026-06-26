@@ -48,7 +48,7 @@
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Configuration Indépendante par Table</p>
+                        <p class="text-xs text-slate-400">Sync Multi-Tables + Images</p>
                     </div>
                 </div>
                 <div class="flex space-x-2">
@@ -67,7 +67,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
                         <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
-                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: http://localhost:8061)">
+                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: https://directus.mysite.com)">
                         <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Token Admin">
                     </div>
                     <div class="space-y-4">
@@ -114,7 +114,7 @@
                 <!-- Étape 3 : Configuration INDÉPENDANTE par table -->
                 <div v-if="selectedCollections.length > 0" class="border-t border-slate-700 pt-6">
                     <h3 class="text-md font-semibold text-white mb-4">3. Configuration des champs par table</h3>
-                    <p class="text-xs text-slate-400 mb-4">Sélectionnez une table ci-dessous pour configurer ses champs spécifiques et son titre.</p>
+                    <p class="text-xs text-slate-400 mb-4">Sélectionnez une table ci-dessous pour configurer ses champs, son titre et ses images.</p>
                     
                     <!-- Onglets des tables sélectionnées -->
                     <div class="flex flex-wrap gap-2 mb-6">
@@ -138,7 +138,8 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll mb-4">
+                        <!-- Grille des champs de données -->
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll mb-6">
                             <label v-for="field in tableFields[activeTable]" :key="field.field" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
                                 <input type="checkbox" :value="field.field" v-model="fieldsSelection[activeTable]" class="hidden">
                                 <div class="text-xs text-slate-300 break-all">
@@ -148,13 +149,47 @@
                             </label>
                         </div>
 
-                        <div class="pt-4 border-t border-slate-800">
-                            <label class="block text-sm text-slate-400 mb-1">Champ utilisé comme TITRE pour cette table :</label>
-                            <select v-model="titleFields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full md:w-1/2">
-                                <option v-for="field in tableFields[activeTable]" :key="field.field" :value="field.field">
-                                    {{ field.field }}
-                                </option>
-                            </select>
+                        <!-- Sélecteurs Spéciaux (Titre + Images) -->
+                        <div class="pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Champ TITRE -->
+                            <div>
+                                <label class="block text-sm text-slate-400 mb-1">Champ TITRE principal :</label>
+                                <select v-model="titleFields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
+                                    <option v-for="field in tableFields[activeTable]" :key="field.field" :value="field.field">
+                                        {{ field.field }}
+                                    </option>
+                                </select>
+                            </div>
+                            
+                            <!-- Champ IMAGE 1 -->
+                            <div>
+                                <label class="block text-sm text-indigo-400 mb-1">🖼️ Champ IMAGE 1 (Optionnel) :</label>
+                                <select v-model="image1Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
+                                    <option value="">-- Aucune --</option>
+                                    <option v-for="field in tableFields[activeTable].filter(f => 
+           				 f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
+         )" 
+        :key="field.field" 
+        :value="field.field">
+        {{ field.field }} 📷
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Champ IMAGE 2 -->
+                            <div>
+                                <label class="block text-sm text-indigo-400 mb-1">🖼️ Champ IMAGE 2 (Optionnel) :</label>
+                                <select v-model="image2Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
+                                    <option value="">-- Aucune --</option>
+                                    <option v-for="field in tableFields[activeTable].filter(f => 
+            				f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
+         )" 
+        :key="field.field" 
+        :value="field.field">
+        {{ field.field }} 📷
+                                    </option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div v-else-if="activeTable" class="text-center py-8 text-slate-500">
@@ -207,12 +242,16 @@
                     loadingCollections: false,
                     collections: [],
                     selectedCollections: [],
-                    activeTable: null, // Table actuellement affichée
+                    activeTable: null,
                     
-                    // Structures de données pour la configuration par table
-                    tableFields: {}, // { "table_A": [fields], "table_B": [fields] }
-                    fieldsSelection: {}, // { "table_A": ["field1", "field2"], "table_B": ["field3"] }
-                    titleFields: {}, // { "table_A": "title", "table_B": "name" }
+                    // Structures de données
+                    tableFields: {}, 
+                    fieldsSelection: {}, 
+                    titleFields: {},
+                    
+                    // NOUVEAUX CHAMPS POUR LES IMAGES
+                    image1Fields: {},
+                    image2Fields: {},
                     
                     logs: [],
                     running: false,
@@ -229,6 +268,9 @@
                         if(parsed.titleFields) this.titleFields = parsed.titleFields;
                         if(parsed.selectedCollections) this.selectedCollections = parsed.selectedCollections;
                         if(parsed.activeTable) this.activeTable = parsed.activeTable;
+                        // Restoration des images
+                        if(parsed.image1Fields) this.image1Fields = parsed.image1Fields;
+                        if(parsed.image2Fields) this.image2Fields = parsed.image2Fields;
                     } catch (e) { console.error(e); }
                 }
             },
@@ -252,7 +294,9 @@
                         selectedCollections: this.selectedCollections,
                         activeTable: this.activeTable,
                         fieldsSelection: this.fieldsSelection,
-                        titleFields: this.titleFields
+                        titleFields: this.titleFields,
+                        image1Fields: this.image1Fields,
+                        image2Fields: this.image2Fields
                     };
                     localStorage.setItem('sanctuaire_config', JSON.stringify(toSave));
                     this.addLog("💾 Configuration sauvegardée.", "success");
@@ -304,23 +348,22 @@
                     }
                 },
                 async handleCollectionChange() {
-                    // Nettoyage des données des tables décochées
                     for (let table of Object.keys(this.tableFields)) {
                         if (!this.selectedCollections.includes(table)) {
                             delete this.tableFields[table];
                             delete this.fieldsSelection[table];
                             delete this.titleFields[table];
+                            delete this.image1Fields[table];
+                            delete this.image2Fields[table];
                         }
                     }
                     
-                    // Gestion de la table active
                     if (this.selectedCollections.length > 0 && !this.activeTable) {
                         this.activeTable = this.selectedCollections[0];
                     } else if (this.selectedCollections.length === 0) {
                         this.activeTable = null;
                     }
 
-                    // Chargement des champs pour les nouvelles tables
                     for (let table of this.selectedCollections) {
                         if (!this.tableFields[table]) {
                             await this.loadFieldsForTable(table);
@@ -344,7 +387,6 @@
                                 return true;
                             });
 
-                            // CORRECTION VUE 3 : Assignation directe au lieu de this.$set
                             this.tableFields[table] = filteredFields;
                             
                             if (!this.fieldsSelection[table]) {
@@ -359,6 +401,10 @@
                                 const titleCandidate = filteredFields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title', 'email'].includes(f.field));
                                 this.titleFields[table] = titleCandidate ? titleCandidate.field : (filteredFields[0]?.field || '');
                             }
+
+                            // Initialisation des champs images (vides par défaut)
+                            if (!this.image1Fields[table]) this.image1Fields[table] = '';
+                            if (!this.image2Fields[table]) this.image2Fields[table] = '';
 
                             this.addLog(`✅ Champs chargés pour '${table}'.`, "success");
                         }
@@ -384,7 +430,9 @@
                     const collectionsConfig = this.selectedCollections.map(table => ({
                         name: table,
                         title_field: this.titleFields[table],
-                        selected_fields: this.fieldsSelection[table]
+                        selected_fields: this.fieldsSelection[table],
+                        image1_field: this.image1Fields[table] || null,
+                        image2_field: this.image2Fields[table] || null
                     }));
 
                     const syncConfig = {
