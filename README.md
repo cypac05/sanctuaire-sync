@@ -1,152 +1,117 @@
 🌱 Sanctuaire Sync
 
-Sanctuaire Sync est un outil de synchronisation automatique conçu pour exporter des données depuis une instance Directus vers Zenodo (ou Zenodo Sandbox). Il permet de créer des dépôts scientifiques (datasets) complets, incluant les métadonnées structurées et les fichiers images associés, le tout en respectant les principes de science ouverte.
-✨ Fonctionnalités
+Synchronisation automatique Directus vers Zenodo (Sandbox & Production)
 
-    Sélection Multi-Tables : Synchronisez plusieurs collections Directus en une seule fois.
-    Configuration Granulaire : Pour chaque table, définissez indépendamment :
-        Le champ utilisé comme Titre du dépôt Zenodo.
-        Les champs à inclure dans la Description.
-        Jusqu'à deux champs Images à joindre automatiquement au dépôt.
-    Proxy CORS Intégré : Contourne les restrictions de sécurité des navigateurs pour se connecter à n'importe quelle instance Directus (locale ou distante) sans configuration serveur complexe.
-    Gestion Intelligente des Images : Détection automatique des types de champs, téléchargement sécurisé depuis Directus et upload vers Zenodo.
-    Sauvegarde Locale : Votre configuration (URL, tokens, sélections) est sauvegardée dans votre navigateur pour une utilisation ultérieure rapide.
+Sanctuaire Sync est une application web légère basée sur FastAPI et Vue.js qui permet de synchroniser automatiquement le contenu de vos collections Directus vers des dépôts Zenodo.
+✨ Fonctionnalités Clés
+
+    Synchronisation Multi-Tables : Traitez plusieurs collections Directus en une seule exécution.
+    Gestion des Images : Télécharge automatiquement les fichiers médias depuis Directus et les upload sur Zenodo.
+    Rétro-écriture Intelligente (Write-Back) :
+        Détecte automatiquement les champs zenodo_doi et zenodo_record_url dans vos tables Directus.
+        Met à jour vos fiches Directus avec le DOI et l'URL du dépôt Zenodo dès la création.
+        Sécurité : Bloque la synchronisation si les champs de retour sont manquants, évitant ainsi les erreurs silencieuses.
+    Interface Moderne : Dashboard interactif en temps réel avec logs détaillés.
+    Respect de la Vie Privée : 100% auto-hébergeable, aucun tiers n'accède à vos données.
 
 📋 Prérequis
-1. Côté Directus
 
-Vous devez avoir une instance Directus fonctionnelle avec :
+    Python 3.9 ou supérieur
+    Directus (v9.0+) avec un token d'administration
+    Zenodo (Compte Sandbox ou Production) avec un token API
+    Accès SSH (pour le déploiement sur serveur)
 
-    Un Token Admin (ou un token utilisateur avec accès en lecture aux collections et aux fichiers).
-    Les collections contenant vos données.
-    (Optionnel mais recommandé) Des champs de type "Fichier" ou "Image" pour les illustrations.
+🚀 Installation Locale (Développement)
 
+    Cloner le dépôt
+
+    bash
+    git clone https://github.com/VOTRE_COMPTE/sanctuaire-sync.git
+    cd sanctuaire-sync
+
+    Créer un environnement virtuel
+
+    bash
+    python3 -m venv venv
+    source venv/bin/activate  # Sur Mac/Linux
+    # ou
+    venv\Scripts\activate     # Sur Windows
+
+    Installer les dépendances
+
+    bash
+    pip install -r requirements.txt
+
+    Lancer le serveur
+
+    bash
+    python main.py
+
+    L'interface est maintenant accessible sur http://127.0.0.1:8000.
+
+🛠️ Utilitaires de Maintenance
+
+Le dépôt inclut un script de nettoyage pour gérer les tests sur Zenodo Sandbox.
+Nettoyer Zenodo Sandbox (clean_sandbox.py)
+
+Ce script supprime tous les dépôts associés à votre token API sur l'environnement de test (Sandbox). Utile pour repartir à zéro après des sessions de tests intensifs.
+
+Attention : Cette action est irréversible.
+
+    Éditez le fichier clean_sandbox.py et remplacez VOTRE_TOKEN_SANDBOX_ICI par votre token Zenodo Sandbox.
+    Lancez le script :
+
+    bash
+    python clean_sandbox.py
+
+    Confirmez en tapant oui.
+
+Le script gère la pagination de l'API et tente de supprimer même les dépôts corrompus ou "metadata only".
+🐳 Déploiement sur Serveur (VPS Infomaniak)
+
+Pour une utilisation en production, il est recommandé d'utiliser Docker sur un VPS Cloud ou VPS Lite Infomaniak.
+1. Préparer le serveur
+
+Connectez-vous en SSH à votre VPS et installez Docker :
+
+bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+2. Construire et lancer le conteneur
+
+À la racine du projet (où se trouve le Dockerfile) :
+
+bash
+# Construire l'image
+docker build -t sanctuaire-sync .
+
+# Lancer le conteneur
+docker run -d -p 8000:8000 --name sync-app sanctuaire-sync
+
+3. Configurer le Reverse Proxy (Optionnel mais recommandé)
+
+Pour exposer le service en HTTPS (via Nginx et Let's Encrypt), configurez votre VPS pour rediriger le domaine vers le port 8000.
 ⚙️ Configuration dans Directus
 
-Pour que la synchronisation fonctionne et que les références soient sauvegardées en retour, vous devez ajouter deux champs spécifiques dans chaque collection à synchroniser.
-A. Champs de Contenu (Source)
+Pour que la rétro-écriture (DOI/URL) fonctionne, vous devez ajouter deux champs Texte dans chacune de vos collections à synchroniser :
 
-Ces champs contiennent les données à envoyer :
+    zenodo_doi : Pour stocker l'identifiant DOI (ex: 10.5072/zenodo.12345).
+    zenodo_record_url : Pour stocker l'URL publique du dépôt (ex: https://sandbox.zenodo.org/records/12345).
 
-    Champ Titre : Un champ texte (ex: nom_variete, titre_projet).
-    Champs Descriptifs : Tous les champs texte que vous souhaitez voir apparaître dans la notice Zenodo.
-    Champs Images : Un ou deux champs de type Fichier ou Image (Interface: file-input ou image).
+    Note : Si ces champs sont absents, l'application affichera une erreur critique dans les logs et refusera de synchroniser la table concernée pour éviter la perte de données.
 
-B. Champs de Retour (Destination) - OBLIGATOIRES
+📄 Structure du Projet
 
-Ces champs sont nécessaires pour que Sanctuaire Sync puisse enregistrer le résultat de l'export dans Directus après la création du dépôt Zenodo. Créez-les dans chaque collection concernée :
+plain text
+sanctuaire-sync/
+├── main.py              # Backend FastAPI (Logique de sync & API)
+├── index.html           # Frontend Vue.js (Interface utilisateur)
+├── clean_sandbox.py     # Script utilitaire de nettoyage Zenodo
+├── requirements.txt     # Dépendances Python
+├── Dockerfile           # Configuration pour conteneurisation
+└── README.md            # Ce fichier
 
-    Nom du Champ (Slug) zenodo_doi    Type : String    Interface : Input    Rôle : Reçoit le DOI unique (ex: 10.5072/zenodo.12345) après publication.
-    Nom du Champ (Slug) zenodo_record_url    Type : String    Interface : Input    Rôle : Reçoit l'URL directe vers le dépôt (ex: https://sandbox.zenodo.org/record/12345).
+📜 Licence
 
-    Note importante : Actuellement, l'outil crée les dépôts en mode "Brouillon" sur Zenodo. Le DOI final n'est attribué qu'au moment de la publication (bouton "Submit" sur le site Zenodo).
-
-        Option 1 (Manuelle) : Vous publiez sur Zenodo, copiez le DOI et l'URL, et les collez dans Directus.
-        Option 2 (Automatique - À venir) : Une future mise à jour pourra écrire automatiquement ces champs via l'API Directus après la publication.
-
-
-2. Côté Zenodo
-
-    Un compte sur Zenodo ou Zenodo Sandbox (pour les tests).
-    Un Token API personnel :
-        Allez dans Settings > Applications > Create new token.
-        Donnez-lui un nom (ex: Sanctuaire Sync).
-        Cochez les permissions : deposit:actions et deposit:write.
-        Copiez le token généré.
-
-3. Côté Système
-
-    Python 3.8 ou supérieur.
-    Git (pour cloner le dépôt).
-
-🚀 Installation et Démarrage
-1. Cloner le projet
-
-bash
-git clone https://github.com/cypac05/sanctuaire-sync.git
-cd sanctuaire-sync
-
-2. Créer un environnement virtuel
-
-bash
-# Sur Mac/Linux
-python3 -m venv venv
-source venv/bin/activate
-
-# Sur Windows
-python -m venv venv
-venv\Scripts\activate
-
-3. Installer les dépendances
-
-bash
-pip install -r requirements.txt
-
-Note : Si vous rencontrez une erreur httpx, installez-le manuellement : pip install httpx.
-4. Lancer le serveur
-
-bash
-python main.py
-
-Le serveur démarre sur http://localhost:8000.
-5. Ouvrir l'interface
-
-Ouvrez votre navigateur et allez sur : http://localhost:8000
-⚙️ Configuration dans Directus
-
-Pour que la synchronisation fonctionne optimalement, assurez-vous que vos collections Directus sont structurées comme suit. Aucune modification technique n'est requise dans le schéma, mais la présence de certains champs est nécessaire pour l'export.
-Champs Recommandés (Métadonnées)
-
-Bien que l'outil puisse utiliser n'importe quel champ texte, il est recommandé d'avoir :
-
-    Un champ Titre (Type: String ou Input) : Pour identifier clairement l'élément.
-    Un champ Description (Type: Text ou Textarea) : Pour le résumé scientifique.
-    Des champs spécifiques à votre domaine (ex: Nom_Latin, Lieu_Origine, Date_Recolte).
-
-Champs Requis pour les Images
-
-Pour utiliser la fonctionnalité d'upload d'images, vous devez avoir dans votre collection au moins un champ de type Fichier ou Image.
-
-    Type de champ : Dans Directus, le type doit être UUID (pour la relation) et l'interface doit être File Input ou Image.
-    Configuration : L'outil détecte automatiquement ces champs dans la liste déroulante de configuration (filtrée par l'icône 📷).
-
-    Note : Si vos champs images n'apparaissent pas dans la liste déroulante de l'interface Sanctuaire Sync, vérifiez dans Directus que leur interface est bien définie sur file-input, file-image ou image.
-
-📖 Utilisation
-
-    Connexion :
-        Entrez l'URL de votre Directus (ex: https://directus.monsite.com) et le Token.
-        Entrez l'URL de Zenodo (https://sandbox.zenodo.org pour tester) et le Token API.
-        Cliquez sur Tester la connexion.
-
-    Sélection des Tables :
-        Cliquez sur Charger la liste des tables.
-        Cochez les collections que vous souhaitez exporter.
-
-    Configuration par Table :
-        Cliquez sur l'onglet d'une table sélectionnée.
-        Champs de données : Cochez les champs à inclure dans la description du dépôt.
-        Champ Titre : Sélectionnez le champ qui servira de titre principal.
-        Champ Image 1 / Image 2 : Sélectionnez les champs contenant les images à joindre (la liste ne montre que les champs compatibles).
-        Répétez pour chaque table.
-
-    Lancement :
-        Cliquez sur 🚀 Lancer la Sync.
-        Suivez la progression dans le terminal intégré.
-        Une fois terminé, connectez-vous à Zenodo pour vérifier vos brouillons ("Drafts").
-
-🛠️ Dépannage
-
-    Erreur 404 sur Directus : Vérifiez que l'URL ne se termine pas par un slash / (ex: utilisez https://.../api et non https://.../api/). L'outil tente de corriger cela automatiquement, mais une URL propre est préférable.
-    Erreur "Illegal header value" : Cela vient souvent d'espaces invisibles dans le Token Zenodo. Régénérez un token et copiez-le soigneusement. L'outil applique maintenant un nettoyage automatique (.strip()).
-    Les images ne s'uploadent pas : Vérifiez que le token Directus a bien les droits de lecture sur la table directus_files (ou que les images sont publiques). Les logs indiqueront "Échec upload image" avec la raison précise.
-    Rien n'apparaît dans Zenodo : Assurez-vous d'utiliser le bon environnement (Sandbox vs Production). Un dépôt créé sur Sandbox n'apparaîtra pas sur le site principal de Zenodo.
-
-📄 Licence
-
-Ce projet est distribué sous licence MIT.
-🤝 Contributeurs
-
-Développé pour le projet Sanctuaire Non-OGM. Basé sur les technologies FastAPI, Vue.js 3, TailwindCSS et les API Directus & Zenodo.
-Prochaine étape suggérée :
-
+Projet open-source développé pour le Sanctuaire Non-OGM. Hébergé sur infrastructure éthique et respectueuse de la vie privée.
