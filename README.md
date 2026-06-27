@@ -26,7 +26,7 @@ Sanctuaire Sync est une application web légère basée sur FastAPI et Vue.js qu
     Cloner le dépôt
 
     bash
-    git clone https://github.com/VOTRE_COMPTE/sanctuaire-sync.git
+    git clone https://github.com/cypac05/sanctuaire-sync.git
     cd sanctuaire-sync
 
     Créer un environnement virtuel
