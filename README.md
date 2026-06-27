@@ -36,8 +36,8 @@ B. Champs de Retour (Destination) - OBLIGATOIRES
 
 Ces champs sont nécessaires pour que Sanctuaire Sync puisse enregistrer le résultat de l'export dans Directus après la création du dépôt Zenodo. Créez-les dans chaque collection concernée :
 
-Nom du Champ (Slug) zenodo_doi	Type String	Interface : Input	Rôle : Reçoit le DOI unique (ex: 10.5072/zenodo.12345) après publication.
-Nom du Champ (Slug) zenodo_record_url	Type String	Interface : Input	Rôle : Reçoit l'URL directe vers le dépôt (ex: https://sandbox.zenodo.org/record/12345).
+    Nom du Champ (Slug) zenodo_doi    Type : String    Interface : Input    Rôle : Reçoit le DOI unique (ex: 10.5072/zenodo.12345) après publication.
+    Nom du Champ (Slug) zenodo_record_url    Type : String    Interface : Input    Rôle : Reçoit l'URL directe vers le dépôt (ex: https://sandbox.zenodo.org/record/12345).
 
     Note importante : Actuellement, l'outil crée les dépôts en mode "Brouillon" sur Zenodo. Le DOI final n'est attribué qu'au moment de la publication (bouton "Submit" sur le site Zenodo).
 
