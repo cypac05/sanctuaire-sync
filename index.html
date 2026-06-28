@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sanctuaire Non-OGM | Sync Zenodo</title>
+    <title>Sanctuaire Non-OGM | Sync Zenodo Auto</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -48,7 +48,7 @@
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Sync Multi-Tables + Images</p>
+                        <p class="text-xs text-slate-400">Sync Auto + Détection Champs</p>
                     </div>
                 </div>
                 <div class="flex space-x-2">
@@ -114,7 +114,7 @@
                 <!-- Étape 3 : Configuration INDÉPENDANTE par table -->
                 <div v-if="selectedCollections.length > 0" class="border-t border-slate-700 pt-6">
                     <h3 class="text-md font-semibold text-white mb-4">3. Configuration des champs par table</h3>
-                    <p class="text-xs text-slate-400 mb-4">Sélectionnez une table ci-dessous pour configurer ses champs, son titre et ses images.</p>
+                    <p class="text-xs text-slate-400 mb-4">Sélectionnez une table ci-dessous pour configurer son titre et ses images. Le retour DOI/URL est automatique.</p>
                     
                     <!-- Onglets des tables sélectionnées -->
                     <div class="flex flex-wrap gap-2 mb-6">
@@ -167,11 +167,11 @@
                                 <select v-model="image1Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
                                     <option value="">-- Aucune --</option>
                                     <option v-for="field in tableFields[activeTable].filter(f => 
-           				 f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
-         )" 
-        :key="field.field" 
-        :value="field.field">
-        {{ field.field }} 📷
+                                         f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
+                                    )" 
+                                    :key="field.field" 
+                                    :value="field.field">
+                                    {{ field.field }} 📷
                                     </option>
                                 </select>
                             </div>
@@ -182,15 +182,31 @@
                                 <select v-model="image2Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
                                     <option value="">-- Aucune --</option>
                                     <option v-for="field in tableFields[activeTable].filter(f => 
-            				f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
-         )" 
-        :key="field.field" 
-        :value="field.field">
-        {{ field.field }} 📷
+                                         f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
+                                    )" 
+                                    :key="field.field" 
+                                    :value="field.field">
+                                    {{ field.field }} 📷
                                     </option>
                                 </select>
                             </div>
                         </div>
+
+                        <!-- NOUVEAU : Bloc d'information sur le retour automatique -->
+                        <div class="mt-6 p-4 bg-emerald-900/20 border border-emerald-800 rounded-lg">
+                            <h4 class="text-emerald-400 font-bold text-sm mb-2">🔙 Retour des données (Automatique)</h4>
+                            <p class="text-xs text-slate-300">
+                                Le système recherchera automatiquement les champs <code class="bg-slate-800 px-1 rounded text-emerald-200">zenodo_doi</code> et <code class="bg-slate-800 px-1 rounded text-emerald-200">zenodo_record_url</code> dans la table <strong>{{ activeTable }}</strong>.
+                            </p>
+                            <p class="text-xs text-slate-400 mt-2">
+                                ⚠️ Si ces champs n'existent pas dans Directus, la synchronisation pour cette table sera bloquée avec un message d'erreur critique.
+                            </p>
+                        </div>
+			<!-- NOUVEAU : Bloc d'information sur le filtre -->
+                        <div class="mt-3 p-3 bg-blue-900/20 border border-blue-800 rounded-lg">
+                            <p class="text-xs text-blue-200">
+                                <span class="font-bold">ℹ️ Filtre actif :</span> Seules les fiches ayant au moins une image (dans les champs sélectionnés ci-dessus) seront synchronisées. Les autres seront ignorées.
+                            </p>
                     </div>
                     <div v-else-if="activeTable" class="text-center py-8 text-slate-500">
                         Chargement des champs pour {{ activeTable }}...
@@ -249,7 +265,7 @@
                     fieldsSelection: {}, 
                     titleFields: {},
                     
-                    // NOUVEAUX CHAMPS POUR LES IMAGES
+                    // Champs pour les images
                     image1Fields: {},
                     image2Fields: {},
                     
@@ -297,6 +313,7 @@
                         titleFields: this.titleFields,
                         image1Fields: this.image1Fields,
                         image2Fields: this.image2Fields
+                        // doiFields et urlFields supprimés car gérés auto par le backend
                     };
                     localStorage.setItem('sanctuaire_config', JSON.stringify(toSave));
                     this.addLog("💾 Configuration sauvegardée.", "success");
@@ -348,6 +365,7 @@
                     }
                 },
                 async handleCollectionChange() {
+                    // Nettoyage des données des tables désélectionnées
                     for (let table of Object.keys(this.tableFields)) {
                         if (!this.selectedCollections.includes(table)) {
                             delete this.tableFields[table];
@@ -358,12 +376,14 @@
                         }
                     }
                     
+                    // Gestion de la table active
                     if (this.selectedCollections.length > 0 && !this.activeTable) {
                         this.activeTable = this.selectedCollections[0];
                     } else if (this.selectedCollections.length === 0) {
                         this.activeTable = null;
                     }
 
+                    // Chargement des champs pour les nouvelles tables
                     for (let table of this.selectedCollections) {
                         if (!this.tableFields[table]) {
                             await this.loadFieldsForTable(table);
@@ -378,14 +398,27 @@
                         });
                         const data = await res.json();
                         if (data.data) {
-                            const systemFields = ['date_created', 'date_updated', 'user_created', 'user_updated', 'sort', 'id'];
-                            const sensitiveFields = ['password', 'token', 'tfa_secret', 'auth_data', 'last_access', 'last_page', 'theme_dark', 'theme_light', 'theme_light_overrides', 'appearance'];
-                            
-                            const filteredFields = data.data.filter(f => {
-                                if (systemFields.includes(f.field)) return false;
-                                if (sensitiveFields.includes(f.field)) return false;
-                                return true;
-                            });
+				const systemFields = ['date_created', 'date_updated', 'user_created', 'user_updated', 'sort', 'id'];
+				const sensitiveFields = ['password', 'token', 'tfa_secret', 'auth_data', 'last_access', 'last_page', 'theme_dark', 'theme_light', 'theme_light_overrides', 'appearance'];
+
+				// Types d'interfaces à exclure de la liste principale (car ils sont dans les sélecteurs d'images)
+				const excludedInterfaces = ['file-input', 'file-image', 'image', 'files', 'file'];
+
+				const filteredFields = data.data.filter(f => {
+    					// Exclure les champs système et sensibles
+    					if (systemFields.includes(f.field)) return false;
+    					if (sensitiveFields.includes(f.field)) return false;
+    
+    					// Exclure les champs de type fichier/image de la liste générale
+    					// On vérifie l'interface ou le type
+    					const interfaceType = f.meta?.interface;
+   					const fieldType = f.type;
+    
+    					if (excludedInterfaces.includes(interfaceType)) return false;
+   					if (fieldType === 'uuid' && f.meta?.note?.toLowerCase().includes('image')) return false;
+    
+    					return true;
+				});
 
                             this.tableFields[table] = filteredFields;
                             
@@ -402,7 +435,7 @@
                                 this.titleFields[table] = titleCandidate ? titleCandidate.field : (filteredFields[0]?.field || '');
                             }
 
-                            // Initialisation des champs images (vides par défaut)
+                            // Initialisation des champs images
                             if (!this.image1Fields[table]) this.image1Fields[table] = '';
                             if (!this.image2Fields[table]) this.image2Fields[table] = '';
 
@@ -427,6 +460,7 @@
                     this.running = true;
                     this.addLog("🚀 Démarrage de la synchronisation...", "info");
                     
+                    // Construction de la configuration sans les champs DOI/URL (gérés par le backend)
                     const collectionsConfig = this.selectedCollections.map(table => ({
                         name: table,
                         title_field: this.titleFields[table],
