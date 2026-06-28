@@ -4,7 +4,7 @@ import sys
 
 # CONFIGURATION
 ZENODO_SANDBOX_URL = "https://sandbox.zenodo.org"
-ACCESS_TOKEN = "Cmdmk5UcVSiTXh7QNMJX4j591HhQlqfh3UHjxa9DPlhhMCzqEEMWl70YagrZ"  # <--- REMPLACEZ CECI PAR VOTRE TOKEN
+ACCESS_TOKEN = "put the token here"  # <--- REMPLACEZ CECI PAR VOTRE TOKEN
 
 def clean_all_depositions():
     print(f"🧹 Nettoyage complet de {ZENODO_SANDBOX_URL}...")
