@@ -29,6 +29,8 @@ class TableConfig(BaseModel):
     selected_fields: List[str]
     image1_field: Optional[str] = None
     image2_field: Optional[str] = None
+    doi_field: Optional[str] = None
+    url_field: Optional[str] = None
 
 class SyncConfig(BaseModel):
     """Configuration globale de synchronisation"""
@@ -41,7 +43,7 @@ class SyncConfig(BaseModel):
 # --- Gestion du Cycle de Vie ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log_message("Démarrage du serveur Sanctuaire Sync (Mode Proxy + Images)...")
+    log_message("Démarrage du serveur Sanctuaire Sync (Auto-DOI + Filtre Images)...")
     yield
     log_message("Arrêt du serveur.")
 
@@ -127,14 +129,39 @@ async def start_sync(config: SyncConfig, background_tasks: BackgroundTasks):
     background_tasks.add_task(run_sync_process, config)
     return {"status": "started"}
 
+async def update_directus_record(directus_url: str, token: str, collection: str, item_id: str, doi: str, url: str, doi_field: str, url_field: str):
+    """Met à jour l'élément Directus avec le DOI et l'URL reçus de Zenodo"""
+    try:
+        payload = {}
+        if doi_field and doi:
+            payload[doi_field] = doi
+        if url_field and url:
+            payload[url_field] = url
+            
+        if not payload:
+            return
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            resp = await client.patch(
+                f"{directus_url}/items/{collection}/{item_id}",
+                json=payload,
+                headers=headers
+            )
+            resp.raise_for_status()
+            log_message(f"   ✅ Directus mis à jour (DOI: {doi if doi else 'N/A'}, URL: {url if url else 'N/A'})")
+    except Exception as e:
+        log_message(f"   ⚠️ Échec mise à jour Directus : {str(e)}")
+
 async def run_sync_process(config: SyncConfig):
     global is_running
     try:
         log_message("🔍 Connexion à Directus...")
-        # Nettoyage des URLs de base
         directus_url = config.directus_url.rstrip("/")
         zenodo_url = config.zenodo_url.rstrip("/")
-        # Nettoyage du Token Zenodo
         clean_token = config.zenodo_token.strip()
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -142,20 +169,46 @@ async def run_sync_process(config: SyncConfig):
             
             total_success = 0
             total_errors = 0
+            total_skipped = 0
 
             for table_config in config.collections:
                 collection_name = table_config.name
-                title_field = table_config.title_field
-                selected_fields = table_config.selected_fields
                 
-                log_message(f"📂 Traitement de la table : {collection_name}")
-                log_message(f"   -> Champ titre : {title_field}")
-                log_message(f"   -> Champs inclus : {len(selected_fields)}")
-                if table_config.image1_field:
-                    log_message(f"   -> Image 1 : {table_config.image1_field}")
-                if table_config.image2_field:
-                    log_message(f"   -> Image 2 : {table_config.image2_field}")
+                # --- ÉTAPE 1 : VÉRIFICATION AUTOMATIQUE DES CHAMPS DE RETOUR ---
+                log_message(f"📂 Vérification de la table : {collection_name}")
                 
+                url_fields_check = f"{directus_url}/fields/{collection_name}"
+                resp_fields = await client.get(url_fields_check, headers=headers)
+                
+                existing_fields = []
+                if resp_fields.status_code == 200:
+                    fields_data = resp_fields.json().get('data', [])
+                    existing_fields = [f['field'] for f in fields_data]
+                
+                expected_doi_field = "zenodo_doi"
+                expected_url_field = "zenodo_record_url"
+                
+                missing_fields = []
+                
+                if expected_doi_field not in existing_fields:
+                    missing_fields.append(expected_doi_field)
+                else:
+                    table_config.doi_field = expected_doi_field
+                    
+                if expected_url_field not in existing_fields:
+                    missing_fields.append(expected_url_field)
+                else:
+                    table_config.url_field = expected_url_field
+
+                if missing_fields:
+                    log_message(f"   ❌ ERREUR CRITIQUE pour '{collection_name}' : Champs manquants : {', '.join(missing_fields)}")
+                    log_message(f"   -> Action requise : Créez les champs '{expected_doi_field}' et '{expected_url_field}' (type Texte) dans Directus.")
+                    total_errors += 1
+                    continue
+                
+                log_message(f"   ✅ Champs de retour détectés : DOI='{table_config.doi_field}', URL='{table_config.url_field}'")
+                # ---------------------------------------------------------------
+
                 try:
                     url = f"{directus_url}/items/{collection_name}?limit=100"
                     resp = await client.get(url, headers=headers)
@@ -168,10 +221,36 @@ async def run_sync_process(config: SyncConfig):
                         log_message(f"   ⚠️ Rien à synchroniser dans '{collection_name}'.")
                         continue
 
+                    # Déterminer si le filtrage par image est actif
+                    must_have_image = (table_config.image1_field or table_config.image2_field)
+                    if must_have_image:
+                        log_message(f"   🖼️  Filtre actif : Seuls les éléments avec image seront traités.")
+
                     for i, item in enumerate(items):
+                        item_id = item.get('id')
+                        if not item_id:
+                            continue
+
+                        # --- ÉTAPE 2 : FILTRE PAR IMAGE ---
+                        has_image = False
+                        
+                        if table_config.image1_field:
+                            val1 = item.get(table_config.image1_field)
+                            if val1: has_image = True
+                        
+                        if not has_image and table_config.image2_field:
+                            val2 = item.get(table_config.image2_field)
+                            if val2: has_image = True
+                        
+                        if must_have_image and not has_image:
+                            log_message(f"   ⏭️  Ignoré (Pas d'image) : ID {item_id}")
+                            total_skipped += 1
+                            continue
+                        # ---------------------------------
+
                         mapping = {
-                            "title_field": title_field,
-                            "selected_fields": selected_fields
+                            "title_field": table_config.title_field,
+                            "selected_fields": table_config.selected_fields
                         }
                         metadata = prepare_zenodo_metadata(item, mapping, collection_name)
                         
@@ -179,11 +258,11 @@ async def run_sync_process(config: SyncConfig):
                             log_message(f"   📤 Envoi vers Zenodo : {metadata.get('title', 'Sans titre')}")
                             
                             try:
-                                # 1. Créer le dépôt (Draft) sur Zenodo
                                 headers_zenodo = {"Authorization": f"Bearer {clean_token}"}
                                 data = {'metadata': metadata}
             
                                 async with httpx.AsyncClient(timeout=30.0) as zenodo_client:
+                                    # 1. Créer le dépôt
                                     res = await zenodo_client.post(
                                         f"{zenodo_url}/api/deposit/depositions", 
                                         json=data, 
@@ -193,9 +272,11 @@ async def run_sync_process(config: SyncConfig):
                                     result = res.json()
                                     
                                     deposition_id = result.get('id')
+                                    html_link = result.get('links', {}).get('html', '')
+                                    
                                     log_message(f"   ✅ Dépôt créé ! ID: {deposition_id}")
                                     
-                                    # 2. GESTION DES IMAGES (NOUVEAU)
+                                    # 2. Gestion des Images
                                     files_to_process = []
                                     if table_config.image1_field and item.get(table_config.image1_field):
                                         files_to_process.append(item[table_config.image1_field])
@@ -206,45 +287,51 @@ async def run_sync_process(config: SyncConfig):
                                         img_url = None
                                         filename = "image.jpg"
                                         
-                                        # Analyse de la référence d'image (Directus peut renvoyer ID, Objet ou URL)
                                         if isinstance(img_ref, str) and img_ref.startswith('http'):
                                             img_url = img_ref
                                             filename = img_ref.split('/')[-1].split('?')[0]
                                         elif isinstance(img_ref, dict) and 'id' in img_ref:
-                                            # Cas standard : objet JSON avec ID
                                             img_url = f"{directus_url}/assets/{img_ref['id']}"
-                                            # Essayer de récupérer le nom original si présent
                                             filename = img_ref.get('filename_download', f"{img_ref['id']}.jpg")
                                         elif isinstance(img_ref, str):
-                                            # Cas : juste l'ID (UUID)
                                             img_url = f"{directus_url}/assets/{img_ref}"
                                             filename = f"{img_ref}.jpg"
                                         
                                         if img_url:
-                                            log_message(f"   🖼️  Téléchargement de {filename}...")
                                             try:
-                                                # Télécharger depuis Directus
                                                 async with httpx.AsyncClient(timeout=30.0) as dl_client:
-                                                    # On utilise le token Directus pour accéder aux assets protégés
                                                     headers_dl = {"Authorization": f"Bearer {config.directus_token}"}
                                                     resp_img = await dl_client.get(img_url, headers=headers_dl)
                                                     resp_img.raise_for_status()
                                                     
                                                     content_type = resp_img.headers.get('Content-Type', 'image/jpeg')
                                                     
-                                                    # Upload vers Zenodo
-                                                    log_message(f"   📤 Upload de {filename} vers Zenodo...")
                                                     files_payload = {'file': (filename, resp_img.content, content_type)}
                                                     upload_url = f"{zenodo_url}/api/deposit/depositions/{deposition_id}/files"
                                                     
-                                                    # On réutilise le client Zenodo ou on en crée un nouveau (ici nouveau pour sécurité)
                                                     async with httpx.AsyncClient(timeout=60.0) as up_client:
                                                         resp_up = await up_client.post(upload_url, files=files_payload, headers=headers_zenodo)
                                                         resp_up.raise_for_status()
                                                         log_message(f"   ✅ Image uploadée : {filename}")
                                             except Exception as img_err:
                                                 log_message(f"   ⚠️ Échec upload image : {str(img_err)}")
-                                    # FIN GESTION IMAGES
+                                    
+                                    # 3. MISE À JOUR DIRECTUS (WRITE-BACK)
+                                    doi_to_save = result.get('doi', '') 
+                                    if not doi_to_save and deposition_id:
+                                        doi_to_save = f"En attente (ID: {deposition_id})"
+                                    
+                                    if table_config.doi_field or table_config.url_field:
+                                        await update_directus_record(
+                                            directus_url, 
+                                            config.directus_token, 
+                                            collection_name, 
+                                            str(item_id), 
+                                            doi_to_save, 
+                                            html_link,
+                                            table_config.doi_field,
+                                            table_config.url_field
+                                        )
 
                                     total_success += 1
                                     
@@ -259,7 +346,7 @@ async def run_sync_process(config: SyncConfig):
                     log_message(f"   ❌ Erreur critique sur '{collection_name}': {str(e)}")
                     total_errors += 1
 
-            log_message(f"🎉 TERMINÉ ! Résumé : {total_success} succès, {total_errors} échecs/ignorés.")
+            log_message(f"🎉 TERMINÉ ! Résumé : {total_success} succès, {total_errors} échecs, {total_skipped} ignorés (filtre).")
 
     except Exception as e:
         log_message(f"❌ Erreur globale : {str(e)}")
@@ -267,7 +354,6 @@ async def run_sync_process(config: SyncConfig):
         is_running = False
 
 def prepare_zenodo_metadata(item: Dict, mapping: Dict, collection_name: str) -> Dict:
-    """Transforme un item Directus en métadonnées Zenodo"""
     title_field = mapping.get('title_field')
     
     if not title_field or title_field not in item:
@@ -278,10 +364,9 @@ def prepare_zenodo_metadata(item: Dict, mapping: Dict, collection_name: str) -> 
     
     for field in mapping.get('selected_fields', []):
         if field in item and item[field] is not None:
-            # Gestion des valeurs complexes (objets) pour l'affichage texte
             val = item[field]
             if isinstance(val, dict):
-                val = str(val.get('id', 'Voir détail')) # Simplification
+                val = str(val.get('id', 'Voir détail'))
             desc_parts.append(f"**{field}**: {val}")
     
     desc_parts.append(f"**Source**: Table '{collection_name}'")
