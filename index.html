@@ -3,538 +3,830 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sanctuaire Non-OGM | Sync Zenodo Auto</title>
+    <title>Sanctuaire Non-OGM | Sync Arborescente</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         .log-entry { font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; }
-        .log-info { color: #60a5fa; }
-        .log-success { color: #34d399; }
-        .log-error { color: #f87171; }
-        .log-warn { color: #fbbf24; }
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 4px solid #fff;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 10px;
-        }
+        .log-info { color: #60a5fa; } .log-success { color: #34d399; } .log-error { color: #f87171; } .log-warn { color: #fbbf24; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .checkbox-tile { transition: all 0.2s; }
-        .checkbox-tile:hover { background-color: #334155; }
-        input[type="checkbox"]:checked + div {
-            background-color: #4f46e5;
-            border-color: #4f46e5;
-            color: white;
-        }
-        .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        .tab-active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
-        .tab-inactive { background-color: #1e293b; color: #94a3b8; border-color: #334155; }
-        .tab-inactive:hover { background-color: #334155; }
+        .custom-scroll::-webkit-scrollbar { width: 8px; } .custom-scroll::-webkit-scrollbar-track { background: #0f172a; } .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        .tree-node { margin-left: 1.5rem; border-left: 2px solid #475569; padding-left: 0.8rem; margin-top: 0.2rem; }
+        .tree-item { display: flex; align-items: center; padding: 0.3rem 0; }
+        .tree-toggle { cursor: pointer; width: 1.5rem; display: inline-flex; justify-content: center; align-items: center; color: #94a3b8; transition: transform 0.2s; font-weight: bold; user-select: none; }
+        .tree-toggle:hover { color: #fff; }
+        .tree-toggle.open { transform: rotate(90deg); color: #4f46e5; }
+        .tree-label { margin-left: 0.5rem; font-size: 0.9rem; color: #e2e8f0; cursor: pointer; user-select: none; }
+        .tree-label:hover { color: #fff; text-decoration: underline; }
+        .relation-badge { font-size: 0.65rem; background: #4f46e5; color: white; padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; font-weight: bold; }
+        
+        .children-list-wrapper { display: block !important; background: rgba(79, 70, 229, 0.05); border: 1px dashed rgba(79, 70, 229, 0.3); padding: 8px; border-radius: 4px; margin-top: 5px; }
+        .custom-select { background-color: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 0.375rem; padding: 0.5rem; width: 100%; outline: none; }
+        .custom-select:focus { border-color: #6366f1; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased">
     <div id="app" class="min-h-screen flex flex-col">
-        <!-- Header -->
         <header class="bg-slate-800 border-b border-slate-700 shadow-lg">
             <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <span class="text-3xl">🌱</span>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">Sanctuaire Non-OGM</h1>
-                        <p class="text-xs text-slate-400">Sync Auto + Détection Champs</p>
+                        <p class="text-xs text-slate-400">Sync Arborescente</p>
                     </div>
                 </div>
-                <div class="flex space-x-2">
-                    <button @click="saveConfig" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded">💾 Sauvegarder</button>
-                    <button @click="clearConfig" class="text-xs bg-slate-700 hover:bg-red-900/50 text-white px-3 py-1.5 rounded">🗑️ Effacer</button>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select @change="loadProfile($event.target.value)" :value="activeProfile"
+                        class="text-xs bg-slate-700 border border-slate-600 text-white px-2 py-1.5 rounded max-w-[180px] truncate">
+                        <option value="">— Profil —</option>
+                        <option v-for="p in profiles" :key="p" :value="p">{{ p }}</option>
+                    </select>
+                    <button @click="saveProfile" class="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1.5 rounded">💾 Sauvegarder</button>
+                    <button @click="newProfile" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded">+ Nouveau</button>
+                    <button @click="deleteProfile" :disabled="!activeProfile" class="text-xs bg-slate-700 hover:bg-red-900/50 text-white px-3 py-1.5 rounded disabled:opacity-40">🗑 Supprimer</button>
                 </div>
             </div>
         </header>
 
         <main class="flex-grow max-w-6xl mx-auto w-full px-6 py-8">
-            <!-- Configuration -->
+            <!-- Config -->
             <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8">
-                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-                    <span class="mr-2">🔌</span> Connexion
-                </h2>
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center"><span class="mr-2">🔌</span> Connexion</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
-                        <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
-                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL (ex: https://directus.mysite.com)">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-bold text-indigo-400 uppercase">Directus</h3>
+                            <span v-if="directus_status === true" class="text-xs text-emerald-400 flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>connecté
+                            </span>
+                            <span v-else-if="directus_status === false" class="text-xs text-red-400 flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>non connecté
+                            </span>
+                        </div>
+                        <input v-model="config.directus_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="URL Directus">
                         <input v-model="config.directus_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Token Admin">
+                        <button @click="testDirectus" :disabled="testingDirectus || !config.directus_url || !config.directus_token"
+                                class="text-xs bg-indigo-800/60 hover:bg-indigo-700 disabled:opacity-40 text-white px-3 py-1.5 rounded transition flex items-center gap-2">
+                            <span>{{ testingDirectus ? '⏳' : '🔌' }}</span>
+                            {{ testingDirectus ? 'Test en cours...' : 'Tester la connexion' }}
+                        </button>
                     </div>
                     <div class="space-y-4">
-                        <h3 class="text-sm font-bold text-emerald-400 uppercase">Zenodo</h3>
-                        <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none" placeholder="URL (ex: https://sandbox.zenodo.org)">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-bold text-emerald-400 uppercase">Zenodo</h3>
+                            <span v-if="zenodo_status === true" class="text-xs text-emerald-400 flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>connecté
+                            </span>
+                            <span v-else-if="zenodo_status === false" class="text-xs text-red-400 flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>non connecté
+                            </span>
+                        </div>
+                        <input v-model="config.zenodo_url" type="text" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none" placeholder="URL Zenodo">
                         <input v-model="config.zenodo_token" type="password" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none" placeholder="Token API">
+                        <div class="flex gap-2">
+                            <button @click="testZenodo" :disabled="testingZenodo || !config.zenodo_url || !config.zenodo_token"
+                                    class="text-xs bg-emerald-800/60 hover:bg-emerald-700 disabled:opacity-40 text-white px-3 py-1.5 rounded transition flex items-center gap-2">
+                                <span>{{ testingZenodo ? '⏳' : '🔌' }}</span>
+                                {{ testingZenodo ? 'Test en cours...' : 'Tester la connexion' }}
+                            </button>
+                            <button v-if="zenodo_status === true" @click="cleanZenodo" :disabled="cleaningZenodo"
+                                    class="text-xs bg-red-900/50 hover:bg-red-800 disabled:opacity-40 text-red-300 hover:text-white px-3 py-1.5 rounded transition flex items-center gap-2">
+                                <span>{{ cleaningZenodo ? '⏳' : '🧹' }}</span>
+                                {{ cleaningZenodo ? 'Nettoyage...' : 'Vider les brouillons' }}
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="mt-4 flex justify-between items-center">
-                    <span v-if="connectionStatus" :class="connectionStatus.success ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-bold">
-                        {{ connectionStatus.message }}
-                    </span>
-                    <button @click="testConnection" class="text-xs text-indigo-400 hover:text-indigo-300 underline">Tester la connexion</button>
                 </div>
             </div>
 
-            <!-- Sélection -->
+            <!-- Étape 1 -->
             <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8" v-if="config.directus_url && config.directus_token">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center"><span class="mr-2">1️⃣</span> Table Principale</h2>
+                <button @click="loadCollections" :disabled="loadingCollections" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm transition flex items-center disabled:opacity-50 mb-4">
+                    <span v-if="loadingCollections" class="spinner w-4 h-4 border-2 border-white/30 border-t-white mr-2"></span>
+                    {{ loadingCollections ? 'Chargement...' : 'Charger les tables' }}
+                </button>
+                <div v-if="collections.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <label v-for="col in collections" :key="col.collection" class="cursor-pointer p-3 rounded border transition flex items-center justify-center text-center"
+                           :class="selectedCollection === col.collection ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'">
+                        <input type="radio" :value="col.collection" v-model="selectedCollection" class="hidden">
+                        <span class="font-medium break-all">{{ col.collection }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Étape 2 : Arborescence (Filtrée) -->
+            <div v-if="selectedCollection && fieldsTree[selectedCollection]" class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8">
+                <h2 class="text-lg font-semibold text-white mb-4">2️⃣ Champs de Données</h2>
+                <p class="text-xs text-slate-400 mb-4 bg-slate-900 p-3 rounded">
+                    📂 Cochez les champs texte/nombres. <br>
+                    <span class="text-purple-400">ℹ️ Les champs images/fichiers sont masqués ici et disponibles à l'étape 3.</span>
+                </p>
+
+                <div class="bg-slate-950 p-6 rounded border border-slate-700 max-h-[500px] overflow-y-auto custom-scroll shadow-inner">
+                    <tree-node 
+                        v-for="field in fieldsTree[selectedCollection]" 
+                        :key="field.field" 
+                        :field="field" 
+                        :selected-collection="selectedCollection"
+                        :checked-fields="checkedFields"
+                        :expanded-nodes="expandedNodes"
+                        :loaded-children="loadedChildren"
+                        :loading-states="loadingStates"
+                        :load-errors="loadErrors"
+                        @toggle-check="toggleCheck"
+                        @toggle-expand="toggleExpand"
+                        @request-load="requestLoad"
+                    ></tree-node>
+                </div>
+
+                <!-- Sélecteur du Champ Titre (multi-champs) -->
+                <div v-if="checkedFields.length > 0" class="mt-4 bg-slate-900 p-3 rounded border border-indigo-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-indigo-400 font-semibold">🏷️ Champs du Titre <span class="text-xs font-normal text-slate-400">(cliquer pour sélectionner, ordre conservé)</span></span>
+                        <span v-if="title_fields_choice.length > 0" class="text-xs text-indigo-300">{{ title_fields_choice.length }} sélectionné(s)</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span @click="toggleTitleField('id')"
+                              class="text-xs px-3 py-1 rounded-full cursor-pointer border transition select-none font-mono"
+                              :class="title_fields_choice.includes('id') ? 'bg-purple-700 border-purple-500 text-white' : 'bg-slate-800 border-purple-800 text-purple-400 hover:bg-slate-700'">
+                            <span v-if="title_fields_choice.includes('id')" class="mr-1 font-bold">{{ title_fields_choice.indexOf('id') + 1 }}.</span>id
+                        </span>
+                        <span v-for="f in checkedFields" :key="f" @click="toggleTitleField(f)"
+                              class="text-xs px-3 py-1 rounded-full cursor-pointer border transition select-none"
+                              :class="title_fields_choice.includes(f) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700'">
+                            <span v-if="title_fields_choice.includes(f)" class="mr-1 font-bold">{{ title_fields_choice.indexOf(f) + 1 }}.</span>{{ f }}
+                        </span>
+                    </div>
+                    <div v-if="title_fields_choice.length > 0" class="mt-2 text-xs text-indigo-200 bg-indigo-900/30 px-2 py-1 rounded">
+                        Aperçu : <em>{{ title_fields_choice.join(' - ') }}</em>
+                    </div>
+                    <div v-else class="mt-1 text-xs text-slate-500 italic">Aucun sélectionné — détection automatique du champ nom/title</div>
+                </div>
+            </div>
+
+            <!-- Étape 3 : Images & Retour -->
+            <div v-if="selectedCollection && fieldsTree[selectedCollection]" class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-6 mb-8">
                 <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-                    <span class="mr-2">📂</span> Configuration des Tables
+                    <span class="mr-2">3️⃣</span> Images & Retour Zenodo
                 </h2>
-                
-                <!-- Étape 1 : Charger les tables -->
-                <div class="mb-6">
-                    <button @click="loadCollections" :disabled="loadingCollections" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm transition flex items-center disabled:opacity-50">
-                        <span v-if="loadingCollections" class="spinner w-4 h-4 border-2 border-white/30 border-t-white mr-2"></span>
-                        {{ loadingCollections ? 'Chargement...' : '1. Charger la liste des tables' }}
-                    </button>
-                </div>
+                <p class="text-xs text-slate-400 mb-6 bg-slate-900 p-3 rounded">
+                    🖼️ Sélectionnez les champs contenant les images à uploader.
+                </p>
 
-                <!-- Étape 2 : Choisir les tables -->
-                <div v-if="collections.length > 0" class="mb-8">
-                    <label class="block text-sm text-slate-400 mb-2">2. Cochez les collections à synchroniser :</label>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 bg-slate-950 rounded border border-slate-700 max-h-48 overflow-y-auto custom-scroll">
-                        <label v-for="col in collections" :key="col.collection" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
-                            <input type="checkbox" :value="col.collection" v-model="selectedCollections" class="hidden">
-                            <div class="text-sm text-slate-300 font-bold break-all">
-                                {{ col.collection }}
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Étape 3 : Configuration INDÉPENDANTE par table -->
-                <div v-if="selectedCollections.length > 0" class="border-t border-slate-700 pt-6">
-                    <h3 class="text-md font-semibold text-white mb-4">3. Configuration des champs par table</h3>
-                    <p class="text-xs text-slate-400 mb-4">Sélectionnez une table ci-dessous pour configurer son titre et ses images. Le retour DOI/URL est automatique.</p>
-                    
-                    <!-- Onglets des tables sélectionnées -->
-                    <div class="flex flex-wrap gap-2 mb-6">
-                        <button 
-                            v-for="col in selectedCollections" 
-                            :key="col"
-                            @click="activeTable = col"
-                            :class="activeTable === col ? 'tab-active' : 'tab-inactive'"
-                            class="px-4 py-2 rounded text-sm font-medium border transition">
-                            {{ col }}
-                        </button>
-                    </div>
-
-                    <!-- Contenu de la table active -->
-                    <div v-if="activeTable && tableFields[activeTable]" class="bg-slate-900 p-4 rounded border border-slate-700">
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="text-indigo-400 font-bold">Champs pour : {{ activeTable }}</h4>
-                            <div class="space-x-2">
-                                <button @click="selectAllFieldsForActive" class="text-xs text-indigo-400 hover:underline">Tout sélectionner</button>
-                                <button @click="deselectAllFieldsForActive" class="text-xs text-slate-400 hover:underline">Aucun</button>
-                            </div>
-                        </div>
-
-                        <!-- Grille des champs de données -->
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 bg-slate-950 rounded custom-scroll mb-6">
-                            <label v-for="field in tableFields[activeTable]" :key="field.field" class="checkbox-tile flex items-center space-x-2 cursor-pointer p-2 rounded border border-slate-800">
-                                <input type="checkbox" :value="field.field" v-model="fieldsSelection[activeTable]" class="hidden">
-                                <div class="text-xs text-slate-300 break-all">
-                                    <span class="font-bold text-indigo-300">{{ field.field }}</span>
-                                    <span v-if="field.meta?.note" class="block text-[10px] text-slate-500 truncate">{{ field.meta.note }}</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <!-- Sélecteurs Spéciaux (Titre + Images) -->
-                        <div class="pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <!-- Champ TITRE -->
-                            <div>
-                                <label class="block text-sm text-slate-400 mb-1">Champ TITRE principal :</label>
-                                <select v-model="titleFields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
-                                    <option v-for="field in tableFields[activeTable]" :key="field.field" :value="field.field">
-                                        {{ field.field }}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h3 class="text-sm font-bold text-purple-400 uppercase">Fichiers à uploader</h3>
+                        <div>
+                            <label class="block text-xs mb-1 font-semibold text-red-400">Image Principale <span class="text-red-500">*</span> (Obligatoire)</label>
+                            <div class="flex items-center gap-3">
+                                <select v-model="image1_field" class="custom-select text-sm flex-grow" :class="!image1_field ? 'border-red-700' : 'border-slate-600'">
+                                    <option value="">-- Sélectionner un champ --</option>
+                                    <option v-for="field in availableImageFields" :key="field.path" :value="field.path">
+                                        {{ field.label }} ({{ field.type }})
                                     </option>
                                 </select>
+                                <span v-if="image1_count" class="text-xs px-2 py-1 rounded flex-shrink-0 whitespace-nowrap font-semibold"
+                                      :class="image1_count.error ? 'bg-red-900/40 text-red-400' : image1_count.count > 0 ? 'bg-emerald-900/60 text-emerald-400' : 'bg-slate-800 text-slate-500'">
+                                    {{ image1_count.error ? '⚠️ accès refusé' : image1_count.count + '/' + image1_count.total + ' avec image' }}
+                                </span>
+                                <span v-else-if="image1_field" class="text-xs text-slate-500 flex-shrink-0">⏳</span>
                             </div>
-                            
-                            <!-- Champ IMAGE 1 -->
-                            <div>
-                                <label class="block text-sm text-indigo-400 mb-1">🖼️ Champ IMAGE 1 (Optionnel) :</label>
-                                <select v-model="image1Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Image Secondaire (Optionnel)</label>
+                            <div class="flex items-center gap-3">
+                                <select v-model="image2_field" class="custom-select text-sm flex-grow">
                                     <option value="">-- Aucune --</option>
-                                    <option v-for="field in tableFields[activeTable].filter(f => 
-                                         f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
-                                    )" 
-                                    :key="field.field" 
-                                    :value="field.field">
-                                    {{ field.field }} 📷
+                                    <option v-for="field in availableImageFields" :key="field.path" :value="field.path">
+                                        {{ field.label }} ({{ field.type }})
                                     </option>
                                 </select>
-                            </div>
-
-                            <!-- Champ IMAGE 2 -->
-                            <div>
-                                <label class="block text-sm text-indigo-400 mb-1">🖼️ Champ IMAGE 2 (Optionnel) :</label>
-                                <select v-model="image2Fields[activeTable]" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-white w-full">
-                                    <option value="">-- Aucune --</option>
-                                    <option v-for="field in tableFields[activeTable].filter(f => 
-                                         f.meta && (f.meta.interface === 'file-input' || f.meta.interface === 'file-image' || f.meta.interface === 'image' || f.type === 'uuid' && f.meta?.note?.toLowerCase().includes('image'))
-                                    )" 
-                                    :key="field.field" 
-                                    :value="field.field">
-                                    {{ field.field }} 📷
-                                    </option>
-                                </select>
+                                <span v-if="image2_count" class="text-xs px-2 py-1 rounded flex-shrink-0 whitespace-nowrap"
+                                      :class="image2_count.error ? 'bg-red-900/40 text-red-400' : image2_count.count > 0 ? 'bg-emerald-900/60 text-emerald-400' : 'bg-slate-800 text-slate-500'">
+                                    {{ image2_count.error ? '⚠️ accès refusé' : image2_count.count + '/' + image2_count.total + ' avec image' }}
+                                </span>
+                                <span v-else-if="image2_field" class="text-xs text-slate-500 flex-shrink-0">⏳</span>
                             </div>
                         </div>
-
-                        <!-- NOUVEAU : Bloc d'information sur le retour automatique -->
-                        <div class="mt-6 p-4 bg-emerald-900/20 border border-emerald-800 rounded-lg">
-                            <h4 class="text-emerald-400 font-bold text-sm mb-2">🔙 Retour des données (Automatique)</h4>
-                            <p class="text-xs text-slate-300">
-                                Le système recherchera automatiquement les champs <code class="bg-slate-800 px-1 rounded text-emerald-200">zenodo_doi</code> et <code class="bg-slate-800 px-1 rounded text-emerald-200">zenodo_record_url</code> dans la table <strong>{{ activeTable }}</strong>.
-                            </p>
-                            <p class="text-xs text-slate-400 mt-2">
-                                ⚠️ Si ces champs n'existent pas dans Directus, la synchronisation pour cette table sera bloquée avec un message d'erreur critique.
-                            </p>
-                        </div>
-			<!-- NOUVEAU : Bloc d'information sur le filtre -->
-                        <div class="mt-3 p-3 bg-blue-900/20 border border-blue-800 rounded-lg">
-                            <p class="text-xs text-blue-200">
-                                <span class="font-bold">ℹ️ Filtre actif :</span> Seules les fiches ayant au moins une image (dans les champs sélectionnés ci-dessus) seront synchronisées. Les autres seront ignorées.
-                            </p>
                     </div>
-                    <div v-else-if="activeTable" class="text-center py-8 text-slate-500">
-                        Chargement des champs pour {{ activeTable }}...
+
+                    <div class="space-y-4">
+                        <h3 class="text-sm font-bold text-emerald-400 uppercase">Champs de Retour (Auto)</h3>
+                        <div class="bg-slate-900 p-4 rounded border border-slate-700 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-300">Champ DOI</span>
+                                <span class="text-xs px-2 py-1 rounded" :class="doiDetected ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'">
+                                    {{ doiDetected ? '✅ Détecté' : '❌ Non trouvé' }}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-300">Champ URL</span>
+                                <span class="text-xs px-2 py-1 rounded" :class="urlDetected ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'">
+                                    {{ urlDetected ? '✅ Détecté' : '❌ Non trouvé' }}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-3 pt-3 border-t border-slate-700">
+                                <span class="text-sm text-slate-300 whitespace-nowrap">Mode :</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" v-model="zenodo_publish" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                    <span class="ms-3 text-sm font-semibold">
+                                        <span v-if="zenodo_publish" class="text-emerald-400">✅ Publier (Validé)</span>
+                                        <span v-else class="text-amber-400">📝 Brouillon</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Lancement -->
-            <div class="flex justify-end mb-6">
-                <button @click="startSync" :disabled="running || !isReadyToSync" 
-                    class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition flex items-center">
+            <div class="flex justify-end mb-6" v-if="selectedCollection">
+                <button @click="startSync" :disabled="running || checkedFields.length === 0 || !image1_field" class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition flex items-center">
                     <div v-if="running" class="spinner"></div>
                     <span>{{ running ? 'Synchronisation...' : '🚀 Lancer la Sync' }}</span>
                 </button>
             </div>
 
             <!-- Logs -->
-            <div class="bg-black rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col h-96">
+            <div class="bg-black rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col h-64" v-if="logs.length > 0 || running">
                 <div class="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
                     <span class="text-xs font-mono text-slate-400">Terminal</span>
-                    <div class="flex space-x-2">
-                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                    </div>
                 </div>
                 <div ref="logContainer" class="p-4 overflow-y-auto flex-grow font-mono text-sm space-y-1 custom-scroll">
                     <div v-if="logs.length === 0" class="text-slate-600 italic">> En attente...</div>
-                    <div v-for="(log, index) in logs" :key="index" class="log-entry break-words p-1 rounded" :class="getLogClass(log)">
-                        {{ log }}
-                    </div>
+                    <div v-for="(log, index) in logs" :key="index" class="log-entry break-words p-1 rounded" :class="getLogClass(log)">{{ log }}</div>
                 </div>
             </div>
         </main>
     </div>
 
+    <!-- Template du Composant Parent (Niveau 1) -->
+    <script type="text/x-template" id="tree-node-template">
+        <div>
+            <!-- FILTRE AJOUTÉ ICI : v-if="!isImageField(field)" -->
+            <div class="tree-item" v-if="!isImageField(field)">
+                <span v-if="field.isRelation" @click="handleExpand" class="tree-toggle" :class="{ 'open': isExpanded }">▶</span>
+                <span v-else class="w-6"></span>
+                <input type="checkbox" :id="fullPath" :value="fullPath" v-model="isChecked" class="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
+                <label :for="fullPath" class="tree-label flex-grow cursor-pointer select-none">
+                    {{ field.field }}
+                    <span v-if="field.isRelation" class="relation-badge">{{ field.targetCollection }}</span>
+                </label>
+            </div>
+
+            <div v-if="isExpanded && field.isRelation" class="tree-node">
+                <div v-if="loadingStates[fullPath]" class="text-xs text-indigo-400 italic pl-2 py-1">
+                    <span class="spinner w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 inline-block mr-2"></span> Chargement...
+                </div>
+                
+                <div v-else-if="hasLoadedChildren" class="children-list-wrapper">
+                    <div class="text-xs text-emerald-400 mb-2 pl-1 font-bold">
+                        ✅ {{ loadedChildren[fullPath].length }} champs :
+                    </div>
+                    <div v-for="(child, idx) in loadedChildren[fullPath]" :key="idx">
+                        <child-node 
+                            :field="child" 
+                            :selected-collection="selectedCollection"
+                            :checked-fields="checkedFields"
+                            :expanded-nodes="expandedNodes"
+                            :loaded-children="loadedChildren"
+                            :loading-states="loadingStates"
+                            :load-errors="loadErrors"
+                            :parent-path="fullPath"
+                            @toggle-check="$emit('toggle-check', $event)"
+                            @toggle-expand="$emit('toggle-expand', $event)"
+                            @request-load="$emit('request-load', $event)"
+                        ></child-node>
+                    </div>
+                </div>
+                
+                <div v-else-if="loadErrors[fullPath]" class="text-xs text-red-400 bg-red-900/20 p-2 rounded mt-1 pl-2 border border-red-900">
+                    ⚠️ Erreur: {{ loadErrors[fullPath] }}
+                </div>
+                <div v-else-if="loadedChildren.hasOwnProperty(fullPath)" class="text-xs text-slate-500 italic pl-2">
+                    (Aucun champ utile)
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <!-- Template du Composant Fils (Niveau 2+) -->
+    <script type="text/x-template" id="child-node-template">
+        <div>
+            <!-- FILTRE AJOUTÉ ICI AUSSI -->
+            <div class="tree-item" v-if="!isImageField(field)">
+                <span v-if="field.isRelation" @click="handleExpand" class="tree-toggle" :class="{ 'open': isExpanded }">▶</span>
+                <span v-else class="w-6"></span>
+                <input type="checkbox" :id="fullPath" :value="fullPath" v-model="isChecked" class="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
+                <label :for="fullPath" class="tree-label flex-grow cursor-pointer select-none">
+                    {{ field.field }}
+                    <span v-if="field.isRelation" class="relation-badge">{{ field.targetCollection }}</span>
+                </label>
+            </div>
+
+            <div v-if="isExpanded && field.isRelation" class="tree-node">
+                <div v-if="loadingStates[fullPath]" class="text-xs text-indigo-400 italic pl-2 py-1">
+                    <span class="spinner w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 inline-block mr-2"></span> Chargement...
+                </div>
+                
+                <div v-else-if="hasLoadedChildren" class="children-list-wrapper">
+                    <div class="text-xs text-emerald-400 mb-2 pl-1 font-bold">
+                        ✅ {{ loadedChildren[fullPath].length }} champs :
+                    </div>
+                    <div v-for="(child, idx) in loadedChildren[fullPath]" :key="idx">
+                        <child-node 
+                            :field="child" 
+                            :selected-collection="selectedCollection"
+                            :checked-fields="checkedFields"
+                            :expanded-nodes="expandedNodes"
+                            :loaded-children="loadedChildren"
+                            :loading-states="loadingStates"
+                            :load-errors="loadErrors"
+                            :parent-path="fullPath"
+                            @toggle-check="$emit('toggle-check', $event)"
+                            @toggle-expand="$emit('toggle-expand', $event)"
+                            @request-load="$emit('request-load', $event)"
+                        ></child-node>
+                    </div>
+                </div>
+                
+                <div v-else-if="loadErrors[fullPath]" class="text-xs text-red-400 bg-red-900/20 p-2 rounded mt-1 pl-2 border border-red-900">
+                    ⚠️ Erreur: {{ loadErrors[fullPath] }}
+                </div>
+                <div v-else-if="loadedChildren.hasOwnProperty(fullPath)" class="text-xs text-slate-500 italic pl-2">
+                    (Aucun champ utile)
+                </div>
+            </div>
+        </div>
+    </script>
+
     <script>
-        const { createApp } = Vue;
+        const { createApp, ref, computed } = Vue;
+
+        // Fonction utilitaire de détection (hors composant pour réutilisation)
+        const checkIsImageField = (field) => {
+            if (!field) return false;
+            const name = field.field.toLowerCase();
+            const type = field.type ? field.type.toLowerCase() : '';
+            // UUID = fichier dans Directus. Ou nom explicite.
+            return (type === 'uuid') || (/image|file|photo|picture|asset|media/i.test(name) && ['string', 'uuid', 'alias'].includes(type));
+        };
+
+        const ChildNodeConfig = {
+            template: '#child-node-template',
+            props: ['field', 'selectedCollection', 'checkedFields', 'expandedNodes', 'loadedChildren', 'loadingStates', 'loadErrors', 'parentPath'],
+            emits: ['toggle-check', 'toggle-expand', 'request-load'],
+            setup(props, { emit }) {
+                const fullPath = props.parentPath ? `${props.parentPath}.${props.field.field}` : props.field.field;
+                const isExpanded = computed(() => props.expandedNodes.includes(fullPath));
+                const hasLoadedChildren = computed(() => {
+                    const data = props.loadedChildren[fullPath];
+                    return data && Array.isArray(data) && data.length > 0;
+                });
+                const isChecked = computed({
+                    get: () => props.checkedFields.includes(fullPath),
+                    set: (val) => emit('toggle-check', { path: fullPath, checked: val })
+                });
+                const handleExpand = () => {
+                    if (!isExpanded.value) {
+                        emit('toggle-expand', fullPath);
+                        const hasChildren = props.loadedChildren.hasOwnProperty(fullPath);
+                        const isLoading = props.loadingStates[fullPath];
+                        if (!hasChildren && !isLoading && props.field.isRelation) {
+                            emit('request-load', { path: fullPath, collection: props.field.targetCollection });
+                        }
+                    } else {
+                        emit('toggle-expand', fullPath);
+                    }
+                };
+                // Expose la fonction de détection au template
+                const isImageField = (f) => checkIsImageField(f);
+
+                return { fullPath, isExpanded, isChecked, hasLoadedChildren, handleExpand, isImageField };
+            }
+        };
+
+        const ChildNode = {
+            ...ChildNodeConfig,
+            components: { 'child-node': null }
+        };
+        ChildNode.components['child-node'] = ChildNode;
+
+        const TreeNode = {
+            template: '#tree-node-template',
+            components: { ChildNode },
+            props: ['field', 'selectedCollection', 'checkedFields', 'expandedNodes', 'loadedChildren', 'loadingStates', 'loadErrors', 'parentPath'],
+            emits: ['toggle-check', 'toggle-expand', 'request-load'],
+            setup(props, { emit }) {
+                const fullPath = props.parentPath ? `${props.parentPath}.${props.field.field}` : props.field.field;
+                const isExpanded = computed(() => props.expandedNodes.includes(fullPath));
+                const hasLoadedChildren = computed(() => {
+                    const data = props.loadedChildren[fullPath];
+                    return data && Array.isArray(data) && data.length > 0;
+                });
+                const isChecked = computed({
+                    get: () => props.checkedFields.includes(fullPath),
+                    set: (val) => emit('toggle-check', { path: fullPath, checked: val })
+                });
+                const handleExpand = () => {
+                    if (!isExpanded.value) {
+                        emit('toggle-expand', fullPath);
+                        const hasChildren = props.loadedChildren.hasOwnProperty(fullPath);
+                        const isLoading = props.loadingStates[fullPath];
+                        if (!hasChildren && !isLoading && props.field.isRelation) {
+                            emit('request-load', { path: fullPath, collection: props.field.targetCollection });
+                        }
+                    } else {
+                        emit('toggle-expand', fullPath);
+                    }
+                };
+                // Expose la fonction de détection au template
+                const isImageField = (f) => checkIsImageField(f);
+
+                return { fullPath, isExpanded, isChecked, hasLoadedChildren, handleExpand, isImageField };
+            }
+        };
+
         createApp({
+            components: { TreeNode, ChildNode },
             data() {
                 return {
-                    config: {
-                        directus_url: 'http://localhost:8061',
-                        directus_token: '',
-                        zenodo_url: 'https://sandbox.zenodo.org',
-                        zenodo_token: ''
-                    },
-                    connectionStatus: null,
-                    loadingCollections: false,
-                    collections: [],
-                    selectedCollections: [],
-                    activeTable: null,
-                    
-                    // Structures de données
-                    tableFields: {}, 
-                    fieldsSelection: {}, 
-                    titleFields: {},
-                    
-                    // Champs pour les images
-                    image1Fields: {},
-                    image2Fields: {},
-                    
-                    logs: [],
-                    running: false,
-                    pollInterval: null
-                }
-            },
-            mounted() {
-                const saved = localStorage.getItem('sanctuaire_config');
-                if (saved) {
-                    try {
-                        const parsed = JSON.parse(saved);
-                        this.config = { ...this.config, ...parsed };
-                        if(parsed.fieldsSelection) this.fieldsSelection = parsed.fieldsSelection;
-                        if(parsed.titleFields) this.titleFields = parsed.titleFields;
-                        if(parsed.selectedCollections) this.selectedCollections = parsed.selectedCollections;
-                        if(parsed.activeTable) this.activeTable = parsed.activeTable;
-                        // Restoration des images
-                        if(parsed.image1Fields) this.image1Fields = parsed.image1Fields;
-                        if(parsed.image2Fields) this.image2Fields = parsed.image2Fields;
-                    } catch (e) { console.error(e); }
+                    config: { directus_url: '', directus_token: '', zenodo_url: '', zenodo_token: '' },
+                    profiles: [],
+                    activeProfile: '',
+                    loadingCollections: false, collections: [], selectedCollection: null,
+                    fieldsTree: {}, 
+                    checkedFields: [], 
+                    expandedNodes: [],
+                    loadedChildren: {},   
+                    loadingStates: {},    
+                    loadErrors: {},       
+                    logs: [], running: false, pollInterval: null,
+                    directus_status: null,
+                    zenodo_status: null,
+                    testingDirectus: false,
+                    testingZenodo: false,
+                    cleaningZenodo: false,
+                    image1_field: '',
+                    image2_field: '',
+                    image1_count: null,
+                    image2_count: null,
+                    zenodo_publish: false,
+                    title_fields_choice: []
                 }
             },
             computed: {
-                isReadyToSync() {
-                    if (!this.config.directus_url || !this.config.directus_token || 
-                        !this.config.zenodo_url || !this.config.zenodo_token ||
-                        this.selectedCollections.length === 0) return false;
-                    
-                    for (let table of this.selectedCollections) {
-                        if (!this.fieldsSelection[table] || this.fieldsSelection[table].length === 0) return false;
-                        if (!this.titleFields[table]) return false;
-                    }
-                    return true;
+                doiDetected() {
+                    if (!this.selectedCollection || !this.fieldsTree[this.selectedCollection]) return false;
+                    return this.fieldsTree[this.selectedCollection].some(f => f.field === 'zenodo_doi');
+                },
+                urlDetected() {
+                    if (!this.selectedCollection || !this.fieldsTree[this.selectedCollection]) return false;
+                    return this.fieldsTree[this.selectedCollection].some(f => f.field === 'zenodo_record_url');
+                },
+                availableImageFields() {
+                    if (!this.selectedCollection) return [];
+                    const candidates = [];
+                    const scanNodes = (nodes, prefix) => {
+                        if (!nodes) return;
+                        nodes.forEach(node => {
+                            const path = prefix ? `${prefix}.${node.field}` : node.field;
+                            const label = prefix ? `${prefix} > ${node.field}` : node.field;
+                            // On utilise la même logique de détection
+                            if (checkIsImageField(node)) {
+                                candidates.push({ path: path, label: label, type: node.type });
+                            }
+                            if (this.loadedChildren[path]) {
+                                scanNodes(this.loadedChildren[path], path);
+                            }
+                        });
+                    };
+                    scanNodes(this.fieldsTree[this.selectedCollection], null);
+                    return candidates;
                 }
             },
+            async mounted() {
+                await this.loadProfiles();
+            },
             methods: {
-                saveConfig() {
-                    const toSave = {
-                        ...this.config,
-                        selectedCollections: this.selectedCollections,
-                        activeTable: this.activeTable,
-                        fieldsSelection: this.fieldsSelection,
-                        titleFields: this.titleFields,
-                        image1Fields: this.image1Fields,
-                        image2Fields: this.image2Fields
-                        // doiFields et urlFields supprimés car gérés auto par le backend
-                    };
-                    localStorage.setItem('sanctuaire_config', JSON.stringify(toSave));
-                    this.addLog("💾 Configuration sauvegardée.", "success");
-                },
-                clearConfig() {
-                    localStorage.removeItem('sanctuaire_config');
-                    location.reload();
-                },
-                async testConnection() {
-                    this.connectionStatus = null;
-                    this.addLog("🔍 Test de connexion...", "info");
+                async loadProfiles() {
                     try {
-                        const res = await fetch(`/api/proxy/server/info`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url }
-                        });
-                        if (res.ok) {
-                            this.connectionStatus = { success: true, message: "✅ Connexion établie" };
-                            this.addLog("✅ Connexion Directus réussie !", "success");
-                        } else {
-                            this.connectionStatus = { success: false, message: "❌ Échec" };
-                            this.addLog("❌ Échec connexion.", "error");
+                        const res = await fetch('/api/profiles');
+                        const data = await res.json();
+                        this.profiles = data.profiles;
+                        if (data.active && data.profiles.includes(data.active)) {
+                            await this.loadProfile(data.active);
                         }
-                    } catch (e) {
-                        this.connectionStatus = { success: false, message: "❌ Erreur" };
-                        this.addLog(`❌ Erreur: ${e.message}`, "error");
+                    } catch (e) { console.error('Erreur chargement profils:', e); }
+                },
+                async loadProfile(name) {
+                    if (!name) return;
+                    try {
+                        const res = await fetch(`/api/profiles/${encodeURIComponent(name)}`);
+                        if (!res.ok) return;
+                        const parsed = await res.json();
+                        this.activeProfile = name;
+                        this.config = { ...this.config, ...parsed.config };
+                        if (parsed.zenodo_publish !== undefined) this.zenodo_publish = parsed.zenodo_publish;
+                        if (parsed.selectedCollection) {
+                            // image1/2_field are restored AFTER selectedCollection is set,
+                            // so the image count watcher fires with the correct collection
+                            this._pendingRestore = {
+                                checkedFields: parsed.checkedFields || [],
+                                title_fields_choice: parsed.title_fields_choice || [],
+                                image1_field: parsed.image1_field !== undefined ? parsed.image1_field : this.image1_field,
+                                image2_field: parsed.image2_field !== undefined ? parsed.image2_field : this.image2_field
+                            };
+                            this.selectedCollection = parsed.selectedCollection;
+                        } else {
+                            if (parsed.image1_field !== undefined) this.image1_field = parsed.image1_field;
+                            if (parsed.image2_field !== undefined) this.image2_field = parsed.image2_field;
+                        }
+                    } catch (e) { console.error('Erreur chargement profil:', e); }
+                },
+                async saveProfile() {
+                    if (!this.activeProfile) {
+                        const name = prompt('Nom du profil :');
+                        if (!name || !name.trim()) return;
+                        this.activeProfile = name.trim();
                     }
+                    const toSave = {
+                        config: this.config,
+                        selectedCollection: this.selectedCollection,
+                        checkedFields: this.checkedFields,
+                        image1_field: this.image1_field,
+                        image2_field: this.image2_field,
+                        zenodo_publish: this.zenodo_publish,
+                        title_fields_choice: this.title_fields_choice
+                    };
+                    try {
+                        const res = await fetch(`/api/profiles/${encodeURIComponent(this.activeProfile)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(toSave)
+                        });
+                        const data = await res.json();
+                        this.activeProfile = data.name;
+                        if (!this.profiles.includes(this.activeProfile)) {
+                            this.profiles.push(this.activeProfile);
+                            this.profiles.sort();
+                        }
+                        this.addLog(`💾 Profil "${this.activeProfile}" sauvegardé.`, "success");
+                    } catch (e) { this.addLog('❌ Erreur sauvegarde profil.', 'error'); }
+                },
+                async newProfile() {
+                    const name = prompt('Nom du nouveau profil :');
+                    if (!name || !name.trim()) return;
+                    this.activeProfile = name.trim();
+                    this.config = { directus_url: '', directus_token: '', zenodo_url: '', zenodo_token: '' };
+                    this.selectedCollection = null;
+                    this.checkedFields = [];
+                    this.title_fields_choice = [];
+                    this.image1_field = '';
+                    this.image2_field = '';
+                    this.zenodo_publish = false;
+                    this.collections = [];
+                    this.fieldsTree = {};
+                    this.directus_status = null;
+                    this.zenodo_status = null;
+                    this.addLog(`📂 Nouveau profil "${name.trim()}" prêt. Configurez et sauvegardez.`, "info");
+                },
+                async deleteProfile() {
+                    if (!this.activeProfile) return;
+                    if (!confirm(`Supprimer le profil "${this.activeProfile}" ?`)) return;
+                    try {
+                        await fetch(`/api/profiles/${encodeURIComponent(this.activeProfile)}`, { method: 'DELETE' });
+                        this.profiles = this.profiles.filter(p => p !== this.activeProfile);
+                        this.activeProfile = '';
+                        this.addLog('🗑 Profil supprimé.', 'info');
+                    } catch (e) { this.addLog('❌ Erreur suppression profil.', 'error'); }
                 },
                 async loadCollections() {
                     this.loadingCollections = true;
-                    this.addLog("📡 Chargement des tables...", "info");
                     try {
-                        const res = await fetch(`/api/proxy/collections`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url }
-                        });
+                        const res = await fetch(`/api/proxy/collections`, { headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url } });
+                        const data = await res.json();
+                        if (data.data) { this.collections = data.data.filter(col => !col.collection.startsWith('directus_')); this.addLog(`✅ ${this.collections.length} tables trouvées.`, "success"); }
+                    } catch (e) { this.addLog(`❌ Erreur: ${e.message}`, "error"); }
+                    finally { this.loadingCollections = false; }
+                },
+                async requestLoad(event) {
+                    const { path, collection } = event;
+                    if (this.loadingStates[path] || this.loadedChildren.hasOwnProperty(path)) return;
+                    this.loadingStates[path] = true;
+                    this.loadErrors[path] = null;
+                    this.addLog(`📡 Chargement de ${collection}...`, "info");
+                    try {
+                        const res = await fetch(`/api/proxy/fields/${collection}`, { headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url } });
                         const data = await res.json();
                         if (data.data) {
-                            this.collections = data.data.filter(col => {
-                                const name = col.collection;
-                                if (name === 'directus_users') return true;
-                                if (name.startsWith('directus_')) return false;
-                                return true;
-                            });
-                            this.addLog(`✅ ${this.collections.length} tables trouvées.`, "success");
+                            const children = data.data.filter(f => !['date_created', 'date_updated', 'user_created', 'user_updated', 'id'].includes(f.field)).map(f => this.mapField(f, collection));
+                            this.loadedChildren[path] = children;
+                            this.addLog(`✅ ${children.length} champs chargés pour ${collection}`, "success");
+                        } else {
+                            this.loadedChildren[path] = [];
                         }
-                    } catch (e) {
-                        this.addLog(`❌ Erreur: ${e.message}`, "error");
+                    } catch (e) { 
+                        this.loadErrors[path] = e.message;
+                        this.addLog(`❌ Erreur chargement ${collection}: ${e.message}`, "error"); 
                     } finally {
-                        this.loadingCollections = false;
+                        this.loadingStates[path] = false;
                     }
                 },
-                async handleCollectionChange() {
-                    // Nettoyage des données des tables désélectionnées
-                    for (let table of Object.keys(this.tableFields)) {
-                        if (!this.selectedCollections.includes(table)) {
-                            delete this.tableFields[table];
-                            delete this.fieldsSelection[table];
-                            delete this.titleFields[table];
-                            delete this.image1Fields[table];
-                            delete this.image2Fields[table];
-                        }
-                    }
-                    
-                    // Gestion de la table active
-                    if (this.selectedCollections.length > 0 && !this.activeTable) {
-                        this.activeTable = this.selectedCollections[0];
-                    } else if (this.selectedCollections.length === 0) {
-                        this.activeTable = null;
-                    }
-
-                    // Chargement des champs pour les nouvelles tables
-                    for (let table of this.selectedCollections) {
-                        if (!this.tableFields[table]) {
-                            await this.loadFieldsForTable(table);
-                        }
-                    }
-                },
-                async loadFieldsForTable(table) {
-                    this.addLog(`🔍 Chargement des champs pour '${table}'...`, "info");
+                async initTreeForCollection(collection) {
+                    this.addLog(`🌳 Construction de l'arbre pour ${collection}...`, "info");
+                    this.loadedChildren = {};
+                    this.loadingStates = {};
+                    this.loadErrors = {};
+                    this.expandedNodes = [];
                     try {
-                        const res = await fetch(`/api/proxy/fields/${table}`, {
-                            headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url }
-                        });
+                        const res = await fetch(`/api/proxy/fields/${collection}`, { headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url } });
                         const data = await res.json();
                         if (data.data) {
-				const systemFields = ['date_created', 'date_updated', 'user_created', 'user_updated', 'sort', 'id'];
-				const sensitiveFields = ['password', 'token', 'tfa_secret', 'auth_data', 'last_access', 'last_page', 'theme_dark', 'theme_light', 'theme_light_overrides', 'appearance'];
-
-				// Types d'interfaces à exclure de la liste principale (car ils sont dans les sélecteurs d'images)
-				const excludedInterfaces = ['file-input', 'file-image', 'image', 'files', 'file'];
-
-				const filteredFields = data.data.filter(f => {
-    					// Exclure les champs système et sensibles
-    					if (systemFields.includes(f.field)) return false;
-    					if (sensitiveFields.includes(f.field)) return false;
-    
-    					// Exclure les champs de type fichier/image de la liste générale
-    					// On vérifie l'interface ou le type
-    					const interfaceType = f.meta?.interface;
-   					const fieldType = f.type;
-    
-    					if (excludedInterfaces.includes(interfaceType)) return false;
-   					if (fieldType === 'uuid' && f.meta?.note?.toLowerCase().includes('image')) return false;
-    
-    					return true;
-				});
-
-                            this.tableFields[table] = filteredFields;
-                            
-                            if (!this.fieldsSelection[table]) {
-                                const commonFields = ['Nom', 'Name', 'Description', 'Notes', 'acc_spiece', 'acc_name_of_accession', 'title', 'email'];
-                                const preSelected = filteredFields
-                                    .filter(f => commonFields.some(cf => f.field.toLowerCase().includes(cf.toLowerCase())))
-                                    .map(f => f.field);
-                                this.fieldsSelection[table] = preSelected.length > 0 ? preSelected : (filteredFields.length > 0 ? [filteredFields[0].field] : []);
-                            }
-                            
-                            if (!this.titleFields[table]) {
-                                const titleCandidate = filteredFields.find(f => ['Nom', 'Name', 'acc_name_of_accession', 'title', 'email'].includes(f.field));
-                                this.titleFields[table] = titleCandidate ? titleCandidate.field : (filteredFields[0]?.field || '');
-                            }
-
-                            // Initialisation des champs images
-                            if (!this.image1Fields[table]) this.image1Fields[table] = '';
-                            if (!this.image2Fields[table]) this.image2Fields[table] = '';
-
-                            this.addLog(`✅ Champs chargés pour '${table}'.`, "success");
+                            const rootFields = data.data.filter(f => !['date_created', 'date_updated', 'user_created', 'user_updated', 'id'].includes(f.field)).map(f => this.mapField(f, collection));
+                            this.fieldsTree[collection] = rootFields;
+                            this.addLog(`✅ Arborescence chargée.`, "success");
                         }
-                    } catch (e) {
-                        this.addLog(`❌ Erreur champs pour ${table}: ${e.message}`, "error");
-                    }
+                    } catch (e) { this.addLog(`❌ Erreur arbre: ${e.message}`, "error"); }
                 },
-                selectAllFieldsForActive() {
-                    if (this.activeTable && this.tableFields[this.activeTable]) {
-                        this.fieldsSelection[this.activeTable] = this.tableFields[this.activeTable].map(f => f.field);
-                    }
+                mapField(field, currentCollection) {
+                    const meta = field.meta || {}; const schema = field.schema || {};
+                    let targetCollection = meta.one_collection;
+                    if (!targetCollection && schema.foreign_key_table) targetCollection = schema.foreign_key_table;
+                    return { field: field.field, type: field.type, isRelation: !!targetCollection, targetCollection };
                 },
-                deselectAllFieldsForActive() {
-                    if (this.activeTable) {
-                        this.fieldsSelection[this.activeTable] = [];
-                    }
+                toggleCheck({ path, checked }) { if (checked) { if (!this.checkedFields.includes(path)) this.checkedFields.push(path); } else { this.checkedFields = this.checkedFields.filter(p => p !== path); } },
+                toggleExpand(path) { 
+                    const idx = this.expandedNodes.indexOf(path); 
+                    if (idx === -1) this.expandedNodes.push(path); 
+                    else this.expandedNodes.splice(idx, 1); 
+                },
+                collapseAll() { this.expandedNodes = []; },
+                async testDirectus() {
+                    this.testingDirectus = true;
+                    this.directus_status = null;
+                    try {
+                        const res = await fetch('/api/proxy/users/me', {
+                            headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url }
+                        });
+                        this.directus_status = res.ok;
+                    } catch (e) { this.directus_status = false; }
+                    finally { this.testingDirectus = false; }
+                },
+                async testZenodo() {
+                    this.testingZenodo = true;
+                    this.zenodo_status = null;
+                    try {
+                        const res = await fetch('/api/test-zenodo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ zenodo_url: this.config.zenodo_url, zenodo_token: this.config.zenodo_token })
+                        });
+                        const data = await res.json();
+                        this.zenodo_status = data.connected;
+                    } catch (e) { this.zenodo_status = false; }
+                    finally { this.testingZenodo = false; }
+                },
+                async cleanZenodo() {
+                    if (!confirm('⚠️ Supprimer TOUS les brouillons Zenodo (non publiés) accessibles avec ce token ?\n\nLes dépôts publiés ne sont pas affectés.\nCette action est irréversible.')) return;
+                    this.cleaningZenodo = true;
+                    try {
+                        const res = await fetch('/api/clean-zenodo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ zenodo_url: this.config.zenodo_url, zenodo_token: this.config.zenodo_token })
+                        });
+                        const data = await res.json();
+                        alert(`✅ Nettoyage terminé :\n• ${data.deleted} brouillon(s) supprimé(s)\n• ${data.skipped} publié(s) ignorés\n• ${data.errors} erreur(s)`);
+                    } catch (e) { alert(`❌ Erreur : ${e.message}`); }
+                    finally { this.cleaningZenodo = false; }
                 },
                 async startSync() {
-                    this.logs = [];
-                    this.running = true;
-                    this.addLog("🚀 Démarrage de la synchronisation...", "info");
-                    
-                    // Construction de la configuration sans les champs DOI/URL (gérés par le backend)
-                    const collectionsConfig = this.selectedCollections.map(table => ({
-                        name: table,
-                        title_field: this.titleFields[table],
-                        selected_fields: this.fieldsSelection[table],
-                        image1_field: this.image1Fields[table] || null,
-                        image2_field: this.image2Fields[table] || null
-                    }));
-
-                    const syncConfig = {
-                        directus_url: this.config.directus_url,
-                        directus_token: this.config.directus_token,
-                        zenodo_url: this.config.zenodo_url,
-                        zenodo_token: this.config.zenodo_token,
-                        collections: collectionsConfig
+                    if (!this.selectedCollection || this.checkedFields.length === 0) return;
+                    this.logs = []; this.running = true; this.addLog("🚀 Démarrage...", "info");
+                    const directFields = [], linkedFields = [];
+                    this.checkedFields.forEach(path => {
+                        const parts = path.split('.');
+                        if (parts.length === 1) directFields.push(parts[0]);
+                        else {
+                            const parentNode = this.fieldsTree[this.selectedCollection]?.find(f => f.field === parts[0]);
+                            const targetCollection = parentNode?.targetCollection || 'Unknown';
+                            linkedFields.push({ relationField: parts[0], targetCollection: targetCollection, targetField: parts.slice(1).join('.') });
+                        }
+                    });
+                    if (!this.image1_field) { this.addLog('❌ Image Principale obligatoire.', 'error'); this.running = false; return; }
+                    const titleField = this.title_fields_choice.length > 0
+                        ? this.title_fields_choice.join('|')
+                        : directFields.find(f => ['nom', 'name', 'title', 'acc_name'].some(k => f.toLowerCase().includes(k))) || directFields[0] || 'id';
+                    const syncConfig = { 
+                        directus_url: this.config.directus_url, 
+                        directus_token: this.config.directus_token, 
+                        zenodo_url: this.config.zenodo_url, 
+                        zenodo_token: this.config.zenodo_token, 
+                        publish: this.zenodo_publish,
+                        collections: [{ 
+                            name: this.selectedCollection, 
+                            title_field: titleField, 
+                            selected_fields: directFields, 
+                            linked_fields: linkedFields, 
+                            image1_field: this.image1_field || null,
+                            image2_field: this.image2_field || null,
+                            doi_field: null, 
+                            url_field: null 
+                        }] 
                     };
-
                     try {
-                        const res = await fetch('/api/start-sync', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(syncConfig)
-                        });
-                        if (!res.ok) throw new Error('Échec démarrage');
+                        const res = await fetch('/api/start-sync', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(syncConfig) });
+                        if (!res.ok) throw new Error('Échec démarrage'); 
                         this.pollLogs();
-                    } catch (e) {
-                        this.addLog(`❌ Erreur: ${e.message}`, "error");
-                        this.running = false;
+                    } catch (e) { 
+                        this.addLog(`❌ Erreur: ${e.message}`, "error"); 
+                        this.running = false; 
                     }
                 },
                 async pollLogs() {
                     if (this.pollInterval) clearInterval(this.pollInterval);
                     this.pollInterval = setInterval(async () => {
                         try {
-                            const res = await fetch('/api/logs');
-                            const data = await res.json();
-                            if (data.logs.length > this.logs.length) {
-                                const newLogs = data.logs.slice(this.logs.length);
-                                newLogs.forEach(log => this.addLog(log, this.detectLogLevel(log)));
-                                this.scrollToBottom();
-                            }
-                            if (!data.running && this.running) {
-                                this.running = false;
-                                clearInterval(this.pollInterval);
-                                this.addLog("🏁 Terminé.", "success");
-                            }
+                            const res = await fetch('/api/logs'); const data = await res.json();
+                            if (data.logs.length > this.logs.length) { data.logs.slice(this.logs.length).forEach(log => this.addLog(log, this.detectLogLevel(log))); this.scrollToBottom(); }
+                            if (!data.running && this.running) { this.running = false; clearInterval(this.pollInterval); this.addLog("🏁 Terminé.", "success"); }
                         } catch (e) { console.error(e); }
                     }, 1000);
                 },
                 addLog(msg, type = 'info') { this.logs.push(msg); },
-                detectLogLevel(msg) {
-                    if (msg.includes('❌') || msg.includes('Erreur')) return 'error';
-                    if (msg.includes('✅') || msg.includes('🎉')) return 'success';
-                    if (msg.includes('⚠️')) return 'warn';
-                    return 'info';
+                detectLogLevel(msg) { if (msg.includes('❌') || msg.includes('Erreur')) return 'error'; if (msg.includes('✅') || msg.includes('🎉')) return 'success'; if (msg.includes('⚠️')) return 'warn'; return 'info'; },
+                getLogClass(log) { if (log.includes('❌')) return 'log-error bg-red-900/10'; if (log.includes('✅') || log.includes('🎉')) return 'log-success bg-emerald-900/10'; if (log.includes('⚠️')) return 'log-warn bg-yellow-900/10'; return 'log-info'; },
+                scrollToBottom() { this.$nextTick(() => { if (this.$refs.logContainer) this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight; }); },
+                toggleTitleField(f) {
+                    const idx = this.title_fields_choice.indexOf(f);
+                    if (idx === -1) this.title_fields_choice.push(f);
+                    else this.title_fields_choice.splice(idx, 1);
                 },
-                getLogClass(log) {
-                    if (log.includes('❌')) return 'log-error bg-red-900/10';
-                    if (log.includes('✅') || log.includes('🎉')) return 'log-success bg-emerald-900/10';
-                    if (log.includes('⚠️')) return 'log-warn bg-yellow-900/10';
-                    return 'log-info';
-                },
-                scrollToBottom() {
-                    this.$nextTick(() => {
-                        if (this.$refs.logContainer) this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight;
-                    });
+                async loadImageCount(fieldPath, targetRef) {
+                    this[targetRef] = null;
+                    if (!fieldPath || !this.selectedCollection || !this.config.directus_url) return;
+                    try {
+                        const url = `/api/proxy/items/${this.selectedCollection}?fields=id,${fieldPath}&limit=-1`;
+                        const res = await fetch(url, { headers: { "Authorization": `Bearer ${this.config.directus_token}`, "X-Target-Url": this.config.directus_url } });
+                        const data = await res.json();
+                        if (data.data) {
+                            const total = data.data.length;
+                            let count = 0;
+                            for (const item of data.data) {
+                                const parts = fieldPath.split('.');
+                                let val = item;
+                                for (const part of parts) { val = val?.[part]; }
+                                if (val) count++;
+                            }
+                            this[targetRef] = { count, total };
+                        } else {
+                            // Erreur API (403, etc.) : on affiche un état d'erreur plutôt que ⏳ infini
+                            this[targetRef] = { count: '?', total: '?', error: true };
+                        }
+                    } catch (e) {
+                        console.error('Count error:', e);
+                        this[targetRef] = { count: '?', total: '?', error: true };
+                    }
                 }
             },
             watch: {
-                selectedCollections: {
-                    handler() {
-                        this.handleCollectionChange();
-                    },
-                    deep: true
-                }
+                selectedCollection(newVal) {
+                    if (newVal) {
+                        this.checkedFields = [];
+                        this.title_fields_choice = [];
+                        this.initTreeForCollection(newVal).then(async () => {
+                            if (this._pendingRestore) {
+                                this.checkedFields = this._pendingRestore.checkedFields;
+                                this.title_fields_choice = this._pendingRestore.title_fields_choice;
+                                this.image1_field = this._pendingRestore.image1_field ?? '';
+                                this.image2_field = this._pendingRestore.image2_field ?? '';
+                                this._pendingRestore = null;
+                                // Auto-charge la relation parente si le champ image est imbriqué
+                                // (sinon le dropdown reste vide car loadedChildren est vide)
+                                const autoLoad = async (fieldPath) => {
+                                    if (!fieldPath || !fieldPath.includes('.')) return;
+                                    const relKey = fieldPath.split('.')[0];
+                                    if (this.loadedChildren.hasOwnProperty(relKey)) return;
+                                    const rootNode = (this.fieldsTree[newVal] || []).find(n => n.field === relKey);
+                                    if (rootNode?.targetCollection) {
+                                        await this.requestLoad({ path: relKey, collection: rootNode.targetCollection });
+                                    }
+                                };
+                                await autoLoad(this.image1_field);
+                                await autoLoad(this.image2_field);
+                            }
+                        });
+                    }
+                },
+                image1_field(newVal) { this.loadImageCount(newVal, 'image1_count'); },
+                image2_field(newVal) { this.loadImageCount(newVal, 'image2_count'); }
             }
         }).mount('#app');
     </script>
